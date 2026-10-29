@@ -56,6 +56,38 @@ deep-sea dark mode and an airy light mode, and every chart and card follows the 
 
 The first run trains the model (about 10 seconds) and saves it in `.cache/`, so later runs start instantly.
 
+- **Store & category totals.** Product forecasts rolled up into categories and the whole store, with ranges that
+  account for shared uncertainty. The totals always add up.
+- **Ask Demandino.** An AI assistant (Claude Opus 5.5) that answers plain-language questions about the forecast on
+  screen. It needs an Anthropic API key: set `ANTHROPIC_API_KEY` on the server, or save a key in your workspace.
+  Only a summary of the forecast is sent, never your raw files.
+- **Workspace** (sign in required).
+  - Accounts: local accounts with scrypt-hashed passwords, a lockout after repeated failures, and sessions that
+    survive reloads.
+  - Saved data: datasets, scenarios (open any saved scenario back on the Forecast page) and share links (read-only,
+    7 days, revocable).
+  - Account settings: change password, or delete your account with all its data.
+- **Connections & alerts.**
+  - Imports: Google Sheets, the Shopify Admin API, the WooCommerce REST API and Amazon "All Orders" reports.
+  - Alerts: order-now, stock-out-soon and demand-spike/drop alerts, plus a weekly digest, sent to Slack or email.
+  - Automatic sending: schedule `scripts/send_digests.py` with cron.
+- **Purchase orders.** A purchase list sent from Demand planning becomes a draft that you approve, reject or mark
+  as ordered.
+- **Forecast tracking.** Track a forecast and compare it with the real sales as they arrive.
+
+**More forecasting features.**
+- **Model inputs:**
+  - **Country holidays:** public holidays for the country you pick in the sidebar.
+  - **Stock-out correction:** days that look sold out are filled with estimated demand, and you can add an
+    `on_hand` column to mark them exactly.
+  - **Outside factors:** upload a CSV of daily values such as ad spend or temperature.
+- **Day explainer:** "Why this day?" on the forecast's Drivers tab.
+- **Demand types:** each product is classed as smooth, erratic, intermittent or lumpy.
+- **Cross-product effects:** the Grow demand page counts promotions net of sales taken from sibling products.
+- **Ordering rules:** minimum order quantities (MOQ), case packs, unit costs, several warehouses, a purchase budget
+  and a weekly cash-flow chart.
+- **Display:** currency conversion with your own exchange rate, PDF reports and a phone-friendly layout.
+
 ## Terms & data handling
 
 The app asks you to accept terms & conditions before first use (see `demandino/legal.py`, and the Terms page
@@ -73,10 +105,10 @@ is 90 days the model never saw during training or calibration. Days the whole sh
 
 | Data | Unseen test window | Daily misses | Weekly misses | Daily WAPE (simple average) |
 |---|---|---|---|---|
-| Real · UCI | 10 Sep – 9 Dec 2011 | 5.3% | 2.5% | 86% (90%) |
-| Real · UCI | 12 Jun – 10 Sep 2011 | 6.2% | 3.3% | 92% (101%) |
-| Simulated | 30 Jul – 28 Oct 2026 | 5.6% | 5.0% | 37% (45%) |
-| Simulated | 1 May – 30 Jul 2026 | 3.6% | 0.8% | 37% (43%) |
+| Real · UCI | 10 Sep – 9 Dec 2011 | 4.5% | 2.3% | 86% (90%) |
+| Real · UCI | 12 Jun – 10 Sep 2011 | 5.1% | 3.1% | 90% (101%) |
+| Simulated | 30 Jul – 28 Oct 2026 | 4.2% | 1.9% | 36% (46%) |
+| Simulated | 1 May – 30 Jul 2026 | 5.5% | 1.1% | 39% (45%) |
 
 Point error (WAPE) is a separate question from range reliability. A single product's daily sales are noisy,
 and on the wholesaler's lumpy orders the point error stays high. The ranges are honest about that rather than
