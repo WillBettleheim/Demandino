@@ -127,30 +127,35 @@ def create_user(username: str, password: str) -> int:
         raise AuthError("Please choose a less guessable password.")
     salt = secrets.token_bytes(16)
     with connect() as con:
-        try:
+        exists = con.execute("SELECT 1 FROM users WHERE username = ?", (username,)).fetchone()
+        if not exists:
             cur = con.execute("INSERT INTO users(username, pw_hash, salt, created) VALUES (?,?,?,?)",
                               (username, _hash_pw(password, salt), salt, time.time()))
-        except sqlite3.IntegrityError:
-            raise AuthError("That username is taken.") from None
-        return int(cur.lastrowid)
+            return int(cur.lastrowid)
+    raise AuthError("That username is taken.")
 
 
 def authenticate(username: str, password: str) -> int:
     with connect() as con:
         row = con.execute("SELECT * FROM users WHERE username = ?", (username.strip(),)).fetchone()
-        if row is None:
-            _hash_pw(password, b"0" * 16)  # same work either way, so timing doesn't reveal usernames
-            raise AuthError("Wrong username or password.")
-        if row["locked_until"] > time.time():
-            raise AuthError(f"Too many failed attempts. Try again in {LOCK_MINUTES} minutes.")
-        if not hmac.compare_digest(_hash_pw(password, row["salt"]), row["pw_hash"]):
+    if row is None:
+        _hash_pw(password, b"0" * 16)  # same work either way, so timing doesn't reveal usernames
+        raise AuthError("Wrong username or password.")
+    if row["locked_until"] > time.time():
+        raise AuthError(f"Too many failed attempts. Try again in {LOCK_MINUTES} minutes.")
+    ok = hmac.compare_digest(_hash_pw(password, row["salt"]), row["pw_hash"])
+    # Record the outcome first (committed when the block exits), then raise — so failed attempts always count.
+    with connect() as con:
+        if ok:
+            con.execute("UPDATE users SET failed = 0, locked_until = 0 WHERE id = ?", (row["id"],))
+        else:
             failed = row["failed"] + 1
             locked = time.time() + LOCK_MINUTES * 60 if failed >= MAX_FAILED else 0
             con.execute("UPDATE users SET failed = ?, locked_until = ? WHERE id = ?",
                         (0 if locked else failed, locked, row["id"]))
-            raise AuthError("Wrong username or password.")
-        con.execute("UPDATE users SET failed = 0, locked_until = 0 WHERE id = ?", (row["id"],))
-        return int(row["id"])
+    if not ok:
+        raise AuthError("Wrong username or password.")
+    return int(row["id"])
 
 
 def change_password(user_id: int, old: str, new: str) -> None:
