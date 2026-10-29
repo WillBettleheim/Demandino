@@ -101,6 +101,7 @@ def portfolio_plan(fc: DemandForecaster, level_unc: float, stock: pd.DataFrame, 
             else:
                 plan.loc[i, "status"] = "Deferred (budget)"
         plan = plan.sort_values(["status", "days_of_cover"]).reset_index(drop=True)
+    plan.attrs["today"] = today
     return plan, pd.concat(daily, ignore_index=True)
 
 
