@@ -11,8 +11,10 @@ st.set_page_config(page_title="Demandino · Demand Forecasting", page_icon=":mat
 ui.inject_css()
 
 with st.sidebar:
-    st.html('<div class="dm-brand">Demand<span>ino</span></div>'
+    st.html('<div class="dm-brand"><i></i><b>Demand<span>ino</span></b></div>'
             '<div class="dm-sub">Machine-learning demand forecasting</div>')
+    ui.theme_toggle()
+legal.sync_cookie()
 
 pages = {
     "Forecast": [
