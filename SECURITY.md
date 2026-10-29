@@ -12,6 +12,8 @@ Measures built into Demandino:
 | Formula injection in CSV/Excel exports | Cells starting with `=`, `+`, `-`, `@`, tab or carriage return are prefixed with `'` | `demandino/security.py`, `demandino/report.py` |
 | Leaking internals in error messages | Users see only the error type, never stack traces; file errors show a short, safe message | `.streamlit/config.toml`, `demandino/state.py` |
 | Cross-site request forgery | Streamlit XSRF and CORS protection kept on explicitly | `.streamlit/config.toml` |
+| Browser scripts | The only JavaScript is Demandino's own static code (theme detection, number animation, theme switch, terms cookie); no user content is ever placed in a script | `demandino/ui.py`, `demandino/legal.py` |
+| Terms cookie | Stores only an acceptance token (`dm_terms`), `SameSite=Strict`, no personal data | `demandino/legal.py` |
 | Supply chain | Dependencies are pinned in `requirements.txt` | |
 
 Recommendations when you deploy:

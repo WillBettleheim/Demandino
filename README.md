@@ -51,6 +51,9 @@ your own data, choose **Upload my CSV** in the sidebar. You can download a templ
 - **Model accuracy.** A back-test on the last 90 days compared with simple baselines, plus error by weeks ahead
   and by category, and feature importance.
 
+**Light and dark mode.** Use the sun/moon switch in the sidebar. The "Lagoon" theme (teal and coral) has a
+deep-sea dark mode and an airy light mode, and every chart and card follows the active mode.
+
 The first run trains the model (about 10 seconds) and saves it in `.cache/`, so later runs start instantly.
 
 ## Terms & data handling
