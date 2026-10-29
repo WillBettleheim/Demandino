@@ -329,6 +329,16 @@ def money(x: float, decimals: int = 0) -> str:
     return f"{sign}{currency()}{abs(x):,.{decimals}f}"
 
 
+def short_money(x: float) -> str:
+    """Compact money for small cards: $8,450 · $478.2K · $1.25M."""
+    a = abs(x)
+    if a < 100_000:
+        return money(x)
+    sign = "-" if x < 0 else ""
+    val, unit = (a / 1e9, "B") if a >= 1e9 else (a / 1e6, "M") if a >= 1e6 else (a / 1e3, "K")
+    return f"{sign}{currency()}{val:,.{2 if val < 10 else 1}f}{unit}"
+
+
 def num(x: float, decimals: int = 0) -> str:
     return f"{x:,.{decimals}f}"
 
