@@ -4,7 +4,7 @@ Run with:  streamlit run app.py
 """
 import streamlit as st
 
-from demandino import legal, ui
+from demandino import account, legal, ui
 from demandino.state import sidebar_data_source
 
 st.set_page_config(page_title="Demandino · Demand Forecasting", page_icon=":material/insights:", layout="wide")
@@ -14,7 +14,10 @@ with st.sidebar:
     st.html('<div class="dm-brand"><i></i><b>Demand<span>ino</span></b></div>'
             '<div class="dm-sub">Machine-learning demand forecasting</div>')
     ui.theme_toggle()
+    if legal.accepted():
+        account.sidebar_account()
 legal.sync_cookie()
+account.sync_cookie()
 
 pages = {
     "Forecast": [
