@@ -35,6 +35,7 @@ CALIBRATION_DAYS = 180
 
 FEATURES = [
     "category", "gap", "log_level", "trend_ratio", "level_cv", "ly_ratio", "cat_ly_ratio",
+    "recent_7", "recent_14", "dow_ratio", "zero_share", "days_since_sale",
     "rel_price", "price_vs_hist", "price_index", "promo",
     "dow", "month", "dom", "doy_sin", "doy_cos", "bf_window", "days_to_xmas", "is_xmas",
     "holiday", "days_to_holiday", "days_after_holiday",
@@ -42,7 +43,10 @@ FEATURES = [
 MAX_DRIVERS = 5
 FEATURE_LABELS = {
     "category": "Product category", "gap": "Days ahead", "log_level": "Recent demand level",
-    "trend_ratio": "Recent momentum (trend)", "level_cv": "Demand volatility", "ly_ratio": "Same season last year (product)",
+    "trend_ratio": "Recent momentum (trend)", "level_cv": "Demand volatility",
+    "recent_7": "Last 7 days vs level", "recent_14": "Last 14 days vs level", "dow_ratio": "This weekday's recent sales",
+    "zero_share": "Share of days with no sales", "days_since_sale": "Days since last sale",
+    "ly_ratio": "Same season last year (product)",
     "cat_ly_ratio": "Same season last year (category)", "rel_price": "Discount vs regular price",
     "price_vs_hist": "Price vs recent average price", "price_index": "Price vs category peers", "promo": "Promotion flag",
     "dow": "Day of week", "month": "Month", "dom": "Day of month", "doy_sin": "Season (annual cycle)",
@@ -193,6 +197,22 @@ def featurise(ctx: SeriesContext, t_idx: np.ndarray, o_idx: np.ndarray, cat_code
     have_prior = o_idx >= 55
     trend = np.where(have_prior, (recent + 0.5) / (prior + 0.5), 1.0)
     hist_price = _window_mean(pcsum, o_idx, LEVEL_WINDOW)
+    r7 = (_window_mean(csum, o_idx, 7) + 0.5) / (level + 0.5)
+    r14 = (_window_mean(csum, o_idx, 14) + 0.5) / (level + 0.5)
+    zcsum = np.concatenate([[0.0], np.cumsum(units == 0)])
+    zero_share = _window_mean(zcsum, o_idx, LEVEL_WINDOW)
+    # This weekday's last 8 weeks relative to the level: the product's own weekly shape.
+    pad = -len(units) % 7
+    s7 = np.cumsum(np.r_[units, np.zeros(pad)].reshape(-1, 7), axis=0).ravel()[: len(units)]
+    j = o_idx - ((o_idx - t_idx) % 7)
+    prev = j - 56
+    s_hi = np.where(j >= 0, s7[np.clip(j, 0, None)], 0.0)
+    s_lo = np.where(prev >= 0, s7[np.clip(prev, 0, None)], 0.0)
+    cnt = (j - np.maximum(prev, j % 7 - 7)) // 7  # same-weekday days in the window (8 once history allows)
+    dow_ratio = ((s_hi - s_lo) / cnt + 0.5) / (level + 0.5)
+    sold = np.where(units > 0, np.arange(len(units)), -10_000)
+    last_sale = np.maximum.accumulate(sold)
+    days_since = np.minimum(o_idx - last_sale[np.clip(o_idx, 0, None)], 120).astype(float)
 
     # Same season last year: demand around t-364 relative to the level at o-364.
     ly_target = _window_mean(csum, t_idx - 364 + 7, 15)
@@ -218,6 +238,11 @@ def featurise(ctx: SeriesContext, t_idx: np.ndarray, o_idx: np.ndarray, cat_code
         "log_level": np.log1p(level),
         "trend_ratio": trend,
         "level_cv": std / (level + 0.5),
+        "recent_7": r7,
+        "recent_14": r14,
+        "dow_ratio": dow_ratio,
+        "zero_share": zero_share,
+        "days_since_sale": days_since,
         "ly_ratio": ly_ratio,
         "cat_ly_ratio": cat_ly,
         "rel_price": price_t / np.maximum(ctx.regular[t_idx], 1e-6),
@@ -528,7 +553,7 @@ class DemandForecaster:
                               float(feats["_level"].iloc[0]), self.level_uncertainty)
 
     EXPLAIN_GROUPS = {
-        "Weekday": ["dow"],
+        "Weekday": ["dow", "dow_ratio"],
         "Time of year": ["month", "dom", "doy_sin", "doy_cos"],
         "Holidays & peak days": ["bf_window", "days_to_xmas", "is_xmas", "holiday", "days_to_holiday",
                                  "days_after_holiday"],
