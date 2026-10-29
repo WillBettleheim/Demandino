@@ -60,8 +60,9 @@ if best is not None:
                  f"extra profit over {inp.horizon} days",
                  f"<b>{html.escape(best['action'])}</b> → {best['units_delta']:+,.0f} units vs today's plan "
                  f"({ui.num(base.total)} units, {ui.money(base.profit)} profit).",
-                 [(best["lever"], "violet"), (f"{len(recs)} options tested", ""),
-                  ("Measured with the model", "good")])
+                 [(best["lever"], "acc"), (f"{len(recs)} options tested", ""),
+                  ("Measured with the model", "good")],
+                 count=(best["profit_delta"], f"adv_{inp.name}", 0, "+" + ui.currency()))
 else:
     ui.spotlight(f"Current plan · {inp.name}", ui.num(base.total), f"units over {inp.horizon} days",
                  f"Your current price and plan are already near the best of the options tested "
@@ -106,7 +107,7 @@ if len(price):
     fig = go.Figure()
     fig.add_scatter(x=price["price"], y=price["units"], name="Units", line=dict(color=ui.HIST), line_shape="spline")
     ui.glow_line(fig, price["price"], price["profit"], ui.GOOD, "Profit", yaxis="y2")
-    fig.add_vline(x=inp.price, line_dash="dot", line_color="rgba(139,124,255,.7)", annotation_text="now")
+    fig.add_vline(x=inp.price, line_dash="dot", line_color="rgba(20,184,166,.8)", annotation_text="now")
     ui.style(fig, "Price · units and profit", height=340,
              yaxis2=dict(title="Profit", overlaying="y", side="right", showgrid=False))
     fig.update_xaxes(title_text=f"Regular price ({ui.currency()})")
