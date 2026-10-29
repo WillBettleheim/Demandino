@@ -230,7 +230,11 @@ def sidebar_data_source() -> AppState | None:
                     st.caption(f"Using {', '.join(drivers.columns)} ({len(drivers)} days).")
                 except (UploadError, ValueError) as exc:
                     st.error(str(exc)[:300])
-        cur = st.selectbox("Currency", ["$", "€", "£", "₹", "¥", "₦", "R", "A$"], key="currency")
+        c1, c2 = st.columns(2)
+        cur = c1.selectbox("Show money in", ["$", "€", "£", "₹", "¥", "₦", "R", "A$"], key="currency")
+        rate = c2.number_input("Exchange rate", min_value=0.0001, max_value=100000.0, value=1.0, format="%.4f",
+                               key=f"fx_{key}", help="1 unit of your data's currency = this many of the shown currency. "
+                                                     "Leave at 1 if your data is already in this currency.")
         if uid is not None:
             db.set_setting(uid, "currency", cur)
 
@@ -242,6 +246,9 @@ def sidebar_data_source() -> AppState | None:
         return None
     country = None if country == "None" else country
     full_key = f"{key}-{country or 'none'}"
+    if abs(rate - 1.0) > 1e-9:
+        sales = sales.assign(price=sales["price"] * rate, regular_price=sales["regular_price"] * rate)
+        full_key += f"-fx{rate:.4f}"
     if drivers is not None:
         full_key += "-drv" + hashlib.md5(pd.util.hash_pandas_object(drivers).values.tobytes()).hexdigest()[:10]
     return AppState(sales=sales, data_key=full_key, source=source, country=country, drivers=drivers)
