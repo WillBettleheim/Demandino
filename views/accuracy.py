@@ -33,7 +33,8 @@ ui.spotlight(
       "good" if m["Daily miss rate"] <= 0.08 else "bad"),
      ("Weekly ✓ under target" if m["Weekly miss rate"] <= 0.08 else "Weekly above target",
       "good" if m["Weekly miss rate"] <= 0.08 else "bad"),
-     (f"{len(open_preds):,} product-days tested", ""), (f"Calibrated to a {RANGE_LABEL} range", "violet")])
+     (f"{len(open_preds):,} product-days tested", ""), (f"Calibrated to a {RANGE_LABEL} range", "acc")],
+    count=(daily_hit * 100, "acc_hit", 1, "", "%"))
 
 with st.container(horizontal=True):
     st.metric("Daily misses", f"{m['Daily miss rate'] * 100:.1f}%", border=True,
@@ -45,6 +46,24 @@ with st.container(horizontal=True):
               delta_color="inverse", help="Total absolute error ÷ total actual units. Lower is better.")
     st.metric("Weekly error (WAPE)", f"{m['WAPE (weekly)'] * 100:.0f}%", border=True)
     st.metric("Bias", f"{m['Bias'] * 100:+.1f}%", border=True, help="Positive = forecasts too high overall.")
+
+c1, c2, c3 = st.columns(3)
+ui.show(ui.gauge(m["Daily miss rate"] * 100, "Daily misses", max_value=20, good_below=8), c1)
+ui.show(ui.gauge(m["Weekly miss rate"] * 100, "Weekly misses", max_value=20, good_below=8), c2)
+wk = bt.get("weekly")
+if wk is not None and len(wk):
+    lim = float(max(wk["actual"].max(), wk["forecast"].max())) * 1.05
+    fig = go.Figure()
+    fig.add_scatter(x=[0, lim], y=[0, lim], mode="lines", line=dict(color=ui.HIST, dash="dot"), hoverinfo="skip",
+                    showlegend=False)
+    fig.add_scatter(x=wk["forecast"], y=wk["actual"], mode="markers", name="Product-week",
+                    marker=dict(color=ui.BRAND, size=6, opacity=0.55), hovertemplate="forecast %{x:,.0f} · actual "
+                    "%{y:,.0f}<extra></extra>")
+    ui.style(fig, "Weekly totals · actual vs forecast", height=230, legend=False, hover="closest")
+    fig.update_layout(margin=dict(l=8, r=8, t=50, b=8))
+    fig.update_xaxes(title_text="Forecast", type="log")
+    fig.update_yaxes(title_text="Actual", type="log")
+    ui.show(fig, c3)
 
 with ui.card("method"):
     st.markdown("##### :material/science: How this was tested")
