@@ -140,6 +140,10 @@ def generate_sample_data(end_date: str | pd.Timestamp | None = None, years: int 
             mu *= rng.lognormal(0, 0.05, n)  # day-level shocks (weather, local events)
             r = 6.0  # negative-binomial dispersion
             units = rng.negative_binomial(r, r / (r + mu))
+            # Occasional stock-outs: nothing sells for a few days until the next delivery arrives.
+            for _ in range(int(rng.integers(1, 4))):
+                at, length = int(rng.integers(60, n - 20)), int(rng.integers(3, 11))
+                units[at:at + length] = 0
 
             frames.append(pd.DataFrame({
                 "date": dates,
