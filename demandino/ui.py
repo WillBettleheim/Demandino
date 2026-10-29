@@ -208,6 +208,16 @@ div[data-testid="stMetricValue"] {font-family: "Space Grotesk", Inter, sans-seri
   .stTabs [data-baseweb="tab-list"] {flex-wrap: nowrap; overflow-x: auto;}
   div[data-testid="stMetric"] {padding: .65rem .75rem;}
   div[data-testid="stMetricValue"] {font-size: 1.6rem;}
+  /* Rows of metric cards pair up two per row instead of stacking one card per screen. */
+  [data-testid="stHorizontalBlock"] > [data-testid="stElementContainer"]:has(> [data-testid="stMetric"]),
+  [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:has(> [data-testid="stVerticalBlock"]
+    > [data-testid="stElementContainer"]:only-child > [data-testid="stMetric"])
+    {flex: 1 1 calc(50% - 1rem) !important; min-width: calc(50% - 1rem) !important; width: auto !important;}
+  [data-testid="stHorizontalBlock"] div[data-testid="stMetricValue"] {font-size: 1.3rem;}
+  [data-testid="stMetricLabel"], [data-testid="stMetricLabel"] *, [data-testid="stMetricDelta"] *
+    {white-space: normal !important; overflow: visible !important; text-overflow: clip !important;}
+  [data-testid="stHorizontalBlock"] div[data-testid="stMetricValue"] > div {overflow: visible; text-overflow: clip;
+    white-space: normal; overflow-wrap: anywhere;}
   [data-testid="stBaseButton-primary"], [data-testid="stBaseButton-secondary"] {min-height: 44px;}
 }
 </style>
