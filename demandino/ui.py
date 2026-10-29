@@ -41,6 +41,7 @@ CSS = """
   --aurora-1: rgba(45,212,191,0.16); --aurora-2: rgba(255,122,89,0.11); --aurora-3: rgba(96,165,250,0.08);
   --tab-on: linear-gradient(135deg, rgba(45,212,191,.26), rgba(255,122,89,.14));
   --chip-good: #4ADE80; --chip-warn: #FBBF24; --chip-bad: #F87171; --chip-acc: #5EEAD4;
+  --bar: rgba(7,11,16,0.72);
 }
 html[data-dm="light"] {
   --a: #0D9488; --b: #EA580C; --c: #2563EB;
@@ -54,6 +55,7 @@ html[data-dm="light"] {
   --aurora-1: rgba(45,212,191,0.18); --aurora-2: rgba(255,122,89,0.10); --aurora-3: rgba(96,165,250,0.10);
   --tab-on: linear-gradient(135deg, rgba(45,212,191,.22), rgba(255,122,89,.12));
   --chip-good: #15803D; --chip-warn: #B45309; --chip-bad: #B91C1C; --chip-acc: #0F766E;
+  --bar: rgba(244,250,250,0.78);
 }
 
 /* Aurora backdrop (static: animating a full-screen layer causes repaint glitches in some browsers). */
@@ -64,7 +66,9 @@ html[data-dm="light"] {
     radial-gradient(46vw 36vh at 60% 100%, var(--aurora-3), transparent 70%) !important;
   background-attachment: fixed !important;
 }
-[data-testid="stHeader"] {background: transparent;}
+/* Top bar: frosted, so content scrolling underneath never collides with the menu buttons. */
+[data-testid="stHeader"] {background: var(--bar); backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4); border-bottom: 1px solid var(--edge);}
 .block-container {padding-top: 2.4rem; padding-bottom: 4rem; max-width: 1440px;}
 
 /* Entrance: content rises in softly when a page opens. */
@@ -190,7 +194,7 @@ div[data-testid="stMetricValue"] {font-family: "Space Grotesk", Inter, sans-seri
 @media (max-width: 640px) {
   .dm-hero {padding: 1.1rem 1.1rem 1rem;} .dm-hero h1 {font-size: 1.55rem;} .dm-hero p {font-size: .92rem;}
   .dm-spot {padding: 1.1rem;} .dm-spot .dm-big {font-size: 2.4rem;}
-  .block-container {padding: 1rem .75rem 3rem;}
+  .block-container {padding: 3.6rem .75rem 3rem;}
   .dm-findings {grid-template-columns: 1fr;} .dm-strip {grid-template-columns: repeat(2, 1fr);}
   .stTabs [data-baseweb="tab-list"] {flex-wrap: nowrap; overflow-x: auto;}
   div[data-testid="stMetric"] {padding: .65rem .75rem;}
