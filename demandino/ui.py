@@ -24,7 +24,8 @@ LAST_YEAR = "#3B82F6"
 PALETTE = ["#14B8A6", "#F97350", "#3B82F6", "#F59E0B", "#EC4899", "#8B5CF6", "#22C55E", "#64748B"]
 SEQ = [[0, "rgba(20,184,166,0.06)"], [0.5, "#14B8A6"], [1, "#F97350"]]  # heatmaps
 
-PAGE_PATHS = ["/", "/planning", "/advisor", "/explore", "/overview", "/accuracy", "/terms"]
+PAGE_PATHS = ["/", "/planning", "/advisor", "/explore", "/overview", "/hierarchy", "/assistant", "/workspace",
+              "/connections", "/orders", "/accuracy", "/tracking", "/terms"]
 
 CSS = """
 <style>
@@ -171,8 +172,16 @@ div[data-testid="stMetricValue"] {font-family: "Space Grotesk", Inter, sans-seri
   {flex: 3 1 560px !important; width: auto !important; min-width: 0;}
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after {animation: none !important; transition: none !important;} }
-@media (max-width: 640px) {.dm-hero h1 {font-size: 1.6rem;} .dm-spot .dm-big {font-size: 2.5rem;}
-  .block-container {padding-top: 1.2rem;}}
+@media (max-width: 640px) {
+  .dm-hero {padding: 1.1rem 1.1rem 1rem;} .dm-hero h1 {font-size: 1.55rem;} .dm-hero p {font-size: .92rem;}
+  .dm-spot {padding: 1.1rem;} .dm-spot .dm-big {font-size: 2.4rem;}
+  .block-container {padding: 1rem .75rem 3rem;}
+  .dm-findings {grid-template-columns: 1fr;} .dm-strip {grid-template-columns: repeat(2, 1fr);}
+  .stTabs [data-baseweb="tab-list"] {flex-wrap: nowrap; overflow-x: auto;}
+  div[data-testid="stMetric"] {padding: .65rem .75rem;}
+  div[data-testid="stMetricValue"] {font-size: 1.6rem;}
+  [data-testid="stBaseButton-primary"], [data-testid="stBaseButton-secondary"] {min-height: 44px;}
+}
 </style>
 """
 
