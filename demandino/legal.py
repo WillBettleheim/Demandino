@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import streamlit as st
 
-TERMS_VERSION = "1.0 · 29 October 2026"
+TERMS_VERSION = "1.1 · 29 October 2026"
 COOKIE = "dm_terms"
-COOKIE_VALUE = "v1.0-2026-10-29"  # remembers acceptance in this browser (e.g. across a light/dark reload)
+COOKIE_VALUE = "v1.1-2026-10-29"  # remembers acceptance in this browser (e.g. across a light/dark reload)
 
 TERMS_MD = """
 **Please read these terms before using Demandino.** By ticking *I accept* you agree to them.
@@ -24,9 +24,17 @@ past sales and the details you provide, and suggests actions such as prices, pro
 
 #### 3. Your data
 - Files you upload are processed **in memory on the server running this app** to produce your forecasts. They are
-  not sold, shared or sent to third parties by Demandino.
-- Uploaded data is **not written to disk** by Demandino. It is kept only for your session and is discarded when the
-  server restarts or the cached results expire.
+  not sold or shared by Demandino.
+- Without an account, uploaded data is **not written to disk**. It is kept only for your session.
+- With an account, data is stored on the server **only when you choose to save it** (datasets, scenarios, tracked
+  forecasts, purchase orders, connected sources). You can delete it, or your whole account, at any time on the
+  Workspace page. Passwords are stored as one-way hashes; connector keys are encrypted.
+- **Optional services you switch on** send data to third parties: store connectors (Shopify, WooCommerce, Google
+  Sheets) fetch your sales from those services; alerts send summaries to the Slack channel or email address you set;
+  the AI assistant sends a summary of the forecast you are viewing (product, numbers, dates — not your raw files)
+  to Anthropic to generate an answer. Each service's own terms apply.
+- Share links let anyone with the link view the shared summary until it expires or you revoke it.
+- Cookies are used only to remember that you accepted these terms and, if you sign in, to keep you signed in.
 - Only upload data you have the right to use. Do not upload personal data about customers (names, emails,
   addresses, payment details). Demandino only needs dates, products, quantities and prices.
 - If someone else hosts this app for you, their own privacy policy and security practices also apply.
