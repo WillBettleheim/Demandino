@@ -105,10 +105,10 @@ is 90 days the model never saw during training or calibration. Days the whole sh
 
 | Data | Unseen test window | Daily misses | Weekly misses | Daily WAPE (simple average) |
 |---|---|---|---|---|
-| Real · UCI | 10 Sep – 9 Dec 2011 | 4.5% | 2.3% | 86% (90%) |
-| Real · UCI | 12 Jun – 10 Sep 2011 | 5.1% | 3.1% | 90% (101%) |
-| Simulated | 30 Jul – 28 Oct 2026 | 4.2% | 1.9% | 36% (46%) |
-| Simulated | 1 May – 30 Jul 2026 | 5.5% | 1.1% | 39% (45%) |
+| Real · UCI | 10 Sep – 9 Dec 2011 | 3.6% | 2.3% | 84% (90%) |
+| Real · UCI | 12 Jun – 10 Sep 2011 | 4.8% | 2.5% | 92% (101%) |
+| Simulated | 30 Jul – 28 Oct 2026 | 3.9% | 1.7% | 36% (46%) |
+| Simulated | 1 May – 30 Jul 2026 | 5.6% | 1.4% | 38% (45%) |
 
 Point error (WAPE) is a separate question from range reliability. A single product's daily sales are noisy,
 and on the wholesaler's lumpy orders the point error stays high. The ranges are honest about that rather than
