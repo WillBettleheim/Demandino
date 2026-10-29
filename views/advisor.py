@@ -123,6 +123,19 @@ if len(timing):
              hover="closest")
     ui.show(fig)
 
+spill = g.get("spillover")
+if spill is not None and len(spill):
+    with ui.card("spill"):
+        st.markdown("##### :material/compare_arrows: Effect on other products in the category")
+        st.caption("While this product was on promotion in the past, its siblings sold this much more (halo) or less "
+                   "(cannibalization) than usual. Promotion numbers above are net of these effects. Effects under 3% "
+                   "or seen on fewer than 15 days count as zero.")
+        st.dataframe(spill[["product_name", "effect", "days", "daily_level"]], hide_index=True, width="stretch",
+                     column_config={"product_name": "Product",
+                                    "effect": st.column_config.NumberColumn("Effect on its sales", format="percent"),
+                                    "days": "Promo days observed",
+                                    "daily_level": st.column_config.NumberColumn("Its units/day", format="%.1f")})
+
 if g["lost_past"] > 0:
     st.info(f"**Possible past stock-outs:** unusually low-sales days in the history add up to about "
             f"{g['lost_past']:,.0f} units below normal. If those were stock-outs, keeping stock available is the "

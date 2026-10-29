@@ -11,7 +11,7 @@ from dataclasses import replace
 import numpy as np
 import pandas as pd
 
-from .analysis import detect_anomalies
+from .analysis import detect_anomalies, promo_spillover
 from .model import DemandForecaster
 from .scenario import ForecastInputs, ScenarioResult, compute
 
@@ -43,6 +43,16 @@ def growth_plan(fc: DemandForecaster, sales: pd.DataFrame, el: tuple, unc: float
     base = _fast(fc, sales, el, unc, plain)
     recs: list[dict] = []
 
+    # Cross-product effects: what this product's promotions do to its siblings' sales, per promo day.
+    spill = promo_spillover(sales, base_inp.pid) if not base_inp.new and base_inp.pid else pd.DataFrame()
+    margin = (base_inp.price - base_inp.cost) / base_inp.price if base_inp.price else 0.0
+    cross_units = float((spill["effect"] * spill["daily_level"]).sum()) if len(spill) else 0.0
+    cross_profit = float((spill["effect"] * spill["daily_level"] * spill["price"]).sum() * margin) if len(spill) else 0.0
+
+    def net(r: ScenarioResult) -> tuple[float, float]:
+        days = float(r.res.promo.sum())
+        return cross_units * days, cross_profit * days
+
     # 1. Price: a full sweep (±30%) using the product's price elasticity.
     prices = []
     for f in np.linspace(0.7, 1.3, 13):
@@ -70,18 +80,25 @@ def growth_plan(fc: DemandForecaster, sales: pd.DataFrame, el: tuple, unc: float
             continue
         for every in (2, 4, 6):
             r = _fast(fc, sales, el, unc, replace(plain, promo_kind="Recurring", discount=disc, every=every, plen=5))
-            grid.append({"discount": disc, "every_weeks": every, "units_delta": r.total - base.total,
-                         "profit_delta": r.profit - base.profit, "result": r})
+            cu, cp = net(r)
+            grid.append({"discount": disc, "every_weeks": every, "units_delta": r.total - base.total + cu,
+                         "profit_delta": r.profit - base.profit + cp, "cross_units": cu, "result": r})
     grid_df = pd.DataFrame(grid)
     if len(grid_df):
         g = grid_df.loc[grid_df["profit_delta"].idxmax()]
+        cross_note = (f" Net of {g['cross_units']:+,.0f} units on other products in the category."
+                      if abs(g["cross_units"]) >= 1 else "")
         if g["profit_delta"] > 0:
-            recs.append(_row("Promotions", f"Run {g['discount']:.0%}-off promos for 5 days every {int(g['every_weeks'])} "
-                                           "weeks", g["result"], base, "Best promotion plan for profit."))
+            row = _row("Promotions", f"Run {g['discount']:.0%}-off promos for 5 days every {int(g['every_weeks'])} "
+                                     "weeks", g["result"], base, "Best promotion plan for profit." + cross_note)
+            row.update(units_delta=g["units_delta"], profit_delta=g["profit_delta"])
+            recs.append(row)
         v = grid_df.loc[grid_df["units_delta"].idxmax()]
-        recs.append(_row("Promotions", f"For maximum volume: {v['discount']:.0%} off, 5 days every "
-                                       f"{int(v['every_weeks'])} weeks", v["result"], base,
-                         "Most extra units; check the profit impact."))
+        row = _row("Promotions", f"For maximum volume: {v['discount']:.0%} off, 5 days every "
+                                 f"{int(v['every_weeks'])} weeks", v["result"], base,
+                   "Most extra units; check the profit impact.")
+        row.update(units_delta=v["units_delta"], profit_delta=v["profit_delta"])
+        recs.append(row)
 
     # 3. Timing: which week is the best moment for one 7-day, 20%-off promotion.
     timing = []
@@ -147,7 +164,7 @@ def growth_plan(fc: DemandForecaster, sales: pd.DataFrame, el: tuple, unc: float
     rec_df = pd.DataFrame(recs)
     if len(rec_df):
         rec_df = rec_df.sort_values(["profit_delta", "units_delta"], ascending=False).reset_index(drop=True)
-    return {"base": base, "recommendations": rec_df, "price": price_df.drop(columns="result", errors="ignore"),
+    return {"base": base, "recommendations": rec_df, "spillover": spill, "price": price_df.drop(columns="result", errors="ignore"),
             "promo_grid": grid_df.drop(columns="result", errors="ignore"),
             "timing": timing_df.drop(columns="result", errors="ignore"), "target": target,
             "lost_past": lost_past, "lost_future": lost_future, "good_practice": GOOD_PRACTICE}
