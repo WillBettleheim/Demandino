@@ -152,6 +152,11 @@ div[data-testid="stMetricValue"] {font-family: "Space Grotesk", Inter, sans-seri
 .dm-findings {display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: .7rem;}
 .dm-finding {padding: .9rem 1rem; border-radius: .95rem; background: var(--glass); border: 1px solid var(--edge);
   font-size: .9rem; line-height: 1.45; animation: dm-rise .6s both; box-shadow: var(--glow);}
+.dm-finding.acc {border-left: 3px solid var(--a);}
+.dm-finding.good {border-left: 3px solid #22C55E;}
+.dm-finding.warn {border-left: 3px solid #F59E0B;}
+.dm-finding.warn .dm-ft {color: var(--chip-warn);}
+.dm-finding.good .dm-ft {color: var(--chip-good);}
 .dm-finding .dm-ft {display: block; font-size: .68rem; letter-spacing: .14em; text-transform: uppercase;
   color: var(--b); margin-bottom: .3rem; font-weight: 700;}
 
@@ -294,6 +299,11 @@ def _md_bold(text: str) -> str:
     return "".join(f"<b>{p}</b>" if i % 2 else p for i, p in enumerate(parts))
 
 
+# Accent per finding: what needs action (warn), what is good news, what is the headline (acc).
+FINDING_TONES = {"expected demand": "acc", "inventory": "warn", "demand type": "warn", "stock-outs": "warn",
+                 "anomalies": "warn", "pricing": "good", "promotion impact": "good", "events": "acc"}
+
+
 def finding_cards(lines: list[str]) -> None:
     """Findings as a grid of cards; a leading '**Title:**' becomes the card's label."""
     cards = []
@@ -301,7 +311,10 @@ def finding_cards(lines: list[str]) -> None:
         title, body = "", line
         if line.startswith("**") and ":**" in line[:60]:
             title, body = line[2:line.index(":**")], line[line.index(":**") + 3:].strip()
-        cards.append(f'<div class="dm-finding" style="animation-delay:{i * 45}ms">'
+        tone = FINDING_TONES.get(title.lower(), "")
+        if title.lower() == "inventory" and "runs out" not in body and "lasts about" not in body:
+            tone = "good"
+        cards.append(f'<div class="dm-finding {tone}" style="animation-delay:{i * 45}ms">'
                      f'<span class="dm-ft">{html.escape(title)}</span>{_md_bold(body)}</div>')
     st.html(f'<div class="dm-findings">{"".join(cards)}</div>')
 
