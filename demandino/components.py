@@ -57,7 +57,7 @@ def show_patterns(g: pd.DataFrame, prof: dict, title: str, show_anomalies: bool 
 
     c1, c2 = st.columns(2)
     ui.show(ui.bar_index(DOW_NAMES, prof["dow_index"].values - 1, f"Weekday pattern · best {prof['best_dow']}"), c1)
-    ui.show(ui.bar_index(MONTH_NAMES, prof["month_index"].values - 1, f"Seasonality · peak {prof['peak_month']}"), c2)
+    ui.show(ui.polar_index(MONTH_NAMES, prof["month_index"].values, f"Seasonal radar · peak {prof['peak_month']}"), c2)
 
     if len(g) >= 120:
         c1, c2 = st.columns(2)
@@ -77,7 +77,7 @@ def show_patterns(g: pd.DataFrame, prof: dict, title: str, show_anomalies: bool 
 
     c1, c2 = st.columns(2)
     hm = heatmap_month_dow(g)
-    fig = go.Figure(go.Heatmap(z=hm.values, x=hm.columns, y=hm.index, colorscale="Purples",
+    fig = go.Figure(go.Heatmap(z=hm.values, x=hm.columns, y=hm.index, colorscale=ui.SEQ,
                                hovertemplate="%{y} · %{x}: %{z:,.1f} units/day<extra></extra>",
                                colorbar=dict(thickness=10)))
     ui.style(fig, "When does it sell? (avg units/day)", height=380, legend=False, hover="closest")
