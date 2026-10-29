@@ -6,14 +6,16 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from demandino import details, ui
+from demandino import assistant, db, details, ui
 from demandino.analysis import DOW_NAMES, product_profile
 from demandino.components import show_patterns
 from demandino.model import RANGE_LABEL
+from demandino.model import demand_class
+from demandino.pdf_report import scenario_pdf
 from demandino.report import scenario_workbook
 from demandino.security import MAX_TEXT, clean_text, safe_csv
 from demandino.scenario import (BASES, PROMO_KINDS, ForecastInputs, ScenarioResult, compute, default_events,
-                                events_tuple, read_history_csv)
+                                events_tuple, inputs_to_json, read_history_csv)
 from demandino.state import app
 
 A = app()
@@ -28,6 +30,10 @@ def run_scenario(data_key: str, inp: ForecastInputs) -> ScenarioResult:
 ui.page_header("Forecast a product",
                "Describe a product and your plans — the model predicts daily demand and explains what drives it. "
                "Results update as you change the inputs.")
+
+if "load_scenario" in st.session_state:
+    st.session_state["pinned_scenario"] = st.session_state.pop("load_scenario")
+pinned: ForecastInputs | None = st.session_state.get("pinned_scenario")
 
 left, right = st.container(key="fc_layout").columns([1, 2.6], gap="large")
 
@@ -124,12 +130,23 @@ with left:
         service = c2.number_input("Service level %", 80.0, 99.9, 95.0, 0.5, key="fc_service",
                                   help="Chance of not running out during a replenishment cycle.") / 100
 
+    driver_plan = ()
+    if A.fc.driver_names:
+        with ui.card("drivers"):
+            st.markdown("**:material/thermostat: Outside factors**")
+            st.caption("Planned average values for the forecast period (defaults: the last 4 weeks).")
+            recent = A.fc.drivers.tail(28).mean()
+            driver_plan = tuple((n, float(st.number_input(n.replace("_", " ").capitalize(), value=float(recent[n]),
+                                                          key=f"fc_drv_{n}"))) for n in A.fc.driver_names)
+
 inputs = ForecastInputs(
     new=new, pid=pid, name=name, category=category, price=float(price), cost=float(cost), horizon=int(horizon),
     start=start, basis=basis, comparable=comparable, expected=expected, ramp_days=ramp_days, history=history_df,
     promo_kind=promo_kind, discount=discount, every=int(every), plen=int(plen),
     promo_dates=tuple(promo_dates) if promo_dates else None, events=events_tuple(events_df), stock=float(stock),
-    lead=int(lead), review=int(review), service=float(service))
+    lead=int(lead), review=int(review), service=float(service), driver_plan=driver_plan)
+if pinned is not None:
+    inputs = pinned
 st.session_state["last_inputs"] = inputs  # lets the Grow demand page analyse this product
 
 # ======================================================================= results
@@ -141,9 +158,27 @@ with right:
     if history_df is not None and history_df["date"].max() >= start:
         st.error("The uploaded history must end before the forecast start date.")
         st.stop()
+    if pinned is not None:
+        c1, c2 = st.columns([4, 1], vertical_alignment="center")
+        c1.info(f"Showing the saved scenario **{pinned.name}** (price {ui.money(pinned.price, 2)}, "
+                f"{pinned.promo_kind.lower()} promotions). The inputs on the left are not applied.",
+                icon=":material/bookmark:")
+        if c2.button("Back to my inputs", icon=":material/edit:", width="stretch"):
+            st.session_state.pop("pinned_scenario", None)
+            st.rerun()
+        if pinned.new and pinned.basis == "history" and pinned.history is None:
+            st.stop()
     with st.spinner("Forecasting…"):
         r = run_scenario(A.data_key, inputs)
     res, inv = r.res, r.inventory
+    st.session_state["last_result"] = r
+    dtype = None
+    if r.history is not None and len(r.history) >= 60:
+        dtype = demand_class(r.history["units_sold"].tail(180).to_numpy())[0]
+        if dtype in ("Intermittent", "Lumpy"):
+            r.insights = r.insights + [f"**Demand type:** {dtype.lower()} — sales come in irregular bursts, so single "
+                                       "days are hard to predict. Plan and order by the week, and keep a higher service "
+                                       "level for this product."]
 
     conf_cls = {"High": "good", "Medium": "warn", "Low": "bad"}[r.confidence]
     per_day = r.total / horizon
@@ -154,7 +189,8 @@ with right:
     ui.spotlight(
         f"{r.inputs.name} · next {horizon} days from {start:%d %b %Y}", ui.num(r.total), "units expected",
         f"{RANGE_LABEL} range <b>{ui.num(r.low)} – {ui.num(r.high)}</b> · {ui.num(per_day, 1)} per day{vs_recent}",
-        [(f"{r.confidence} confidence", conf_cls), (r.inputs.category, ""), stock_chip,
+        [(f"{r.confidence} confidence", conf_cls), (r.inputs.category, ""), stock_chip]
+        + ([(f"{dtype} demand", "warn" if dtype in ("Intermittent", "Lumpy") else "")] if dtype else []) + [
          (f"In testing, {A.backtest['metrics']['Daily miss rate']:.1%} of real days fell outside the range", "acc")],
         count=(r.total, "fc_total", 0))
 
@@ -173,8 +209,13 @@ with right:
         with st.popover("Save scenario", icon=":material/bookmark_add:"):
             sname = clean_text(st.text_input("Scenario name", f"{r.inputs.name} · {r.inputs.promo_kind.lower()} · "
                                              f"{ui.money(r.inputs.price, 2)}"[:MAX_TEXT], max_chars=MAX_TEXT))
+            to_ws = st.checkbox("Also save to my workspace", value=True, disabled=A.user_id is None,
+                                help="Sign in to keep scenarios after you close the page.")
             if st.button("Save", type="primary", icon=":material/save:", disabled=not sname):
                 st.session_state.setdefault("scenarios", {})[sname] = r
+                if to_ws and A.user_id is not None:
+                    db.save_scenario(A.user_id, sname, inputs_to_json(inputs),
+                                     {"units": r.total, "profit": r.profit, "revenue": r.revenue})
                 st.toast(f"Saved “{sname}” — compare it in the Scenarios tab.", icon=":material/bookmark:")
 
     rows = details.checklist(inputs, default_price, round(default_price * 0.55, 2))
@@ -265,6 +306,26 @@ with right:
                    "ML model adds for time of year, momentum, weekdays and holidays. **Price change**: effect of your "
                    f"price vs the current one (elasticity {r.elasticity:.2f}). **Promotions**, **Events** and "
                    "**Launch ramp-up** follow your plan.")
+        st.markdown("##### :material/help: Why this day?")
+        day = st.select_slider("Pick a day", options=list(range(len(res.dates))), value=int(np.argmax(res.mean)),
+                               format_func=lambda i: f"{res.dates[i]:%a %d %b}", key="fc_explain_day")
+        target, avg, parts = A.fc.explain_day(day=day, **r.explain_args)
+        k = float(res.mean[day]) / target if target > 0 else 1.0  # price, events and ramp-up applied after the model
+        parts = [(n, v * k) for n, v in parts]
+        fig = go.Figure(go.Waterfall(
+            orientation="h", y=["Average day"] + [n for n, _ in parts] + [f"{res.dates[day]:%a %d %b}"],
+            x=[avg * k] + [v for _, v in parts] + [float(res.mean[day])],
+            measure=["absolute"] + ["relative"] * len(parts) + ["total"],
+            increasing=dict(marker_color=ui.GOOD), decreasing=dict(marker_color=ui.BAD), totals=dict(marker_color=ui.FC),
+            connector=dict(line=dict(color="rgba(124,139,154,0.4)")),
+            text=[f"{avg * k:,.1f}"] + [f"{v:+,.1f}" for _, v in parts] + [f"{res.mean[day]:,.1f}"],
+            textposition="outside", hovertemplate="%{y}: %{x:,.1f}<extra></extra>"))
+        ui.style(fig, f"{res.dates[day]:%A %d %B}: {res.mean[day]:,.1f} units vs {avg * k:,.1f} on an average day",
+                 height=380, legend=False, hover="closest")
+        fig.update_yaxes(autorange="reversed")
+        ui.show(fig)
+        st.caption("Each bar is how much that kind of input moves this day away from an average day in the forecast "
+                   "(the model is re-run with that input taken from every other day).")
         imp = A.backtest["importance"].head(10)[::-1]
         fig = go.Figure(go.Bar(x=imp.values, y=imp.index, orientation="h", marker_color=ui.BRAND,
                                hovertemplate="%{y}: %{x:.3f}<extra></extra>"))
@@ -426,6 +487,24 @@ with right:
                            icon=":material/table_view:", type="primary", width="stretch")
         c2.download_button("Daily forecast (CSV)", safe_csv(out), f"forecast_{inputs.name}.csv", "text/csv",
                            icon=":material/download:", width="stretch")
+        c1.download_button("PDF report", scenario_pdf(r, ui.currency()), f"forecast_{inputs.name}.pdf",
+                           "application/pdf", icon=":material/picture_as_pdf:", width="stretch")
+        if A.user_id is not None:
+            if c2.button("Track this forecast", icon=":material/track_changes:", width="stretch",
+                         help="Compare it with real sales as they arrive (Forecast tracking page)."):
+                db.log_forecast(A.user_id, A.data_key, inputs.pid or f"new:{inputs.name}", inputs.name,
+                                {"dates": [d.strftime("%Y-%m-%d") for d in res.dates], "mean": res.mean.round(3).tolist(),
+                                 "lower": res.lower.round(3).tolist(), "upper": res.upper.round(3).tolist()})
+                st.toast("Tracking — see the Forecast tracking page.", icon=":material/check:")
+            if st.button("Create a share link (valid 7 days)", icon=":material/link:"):
+                token = db.create_share(A.user_id, f"{inputs.name} · {inputs.horizon}-day forecast",
+                                        {"summary": assistant.forecast_summary(r, ui.currency()),
+                                         "currency": ui.currency()})
+                base = str(st.context.url).split("?")[0].rsplit("/", 1)[0] if st.context.url else ""
+                st.code(f"{base}/?share={token}", language=None)
+                st.caption("Anyone with this link can view a read-only summary. Revoke it on the Workspace page.")
+        else:
+            st.caption("Sign in to track this forecast against real sales or create a share link.")
         st.dataframe(out, hide_index=True, width="stretch", column_config={
             "date": st.column_config.DateColumn("Date"),
             **{c: st.column_config.NumberColumn(format="%.1f") for c in ("forecast", "lower", "upper",
