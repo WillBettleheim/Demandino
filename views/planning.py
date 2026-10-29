@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
@@ -97,6 +98,27 @@ c2.download_button("Full plan (CSV)", safe_csv(plan.drop(columns=["trend"])), "d
                    "text/csv", icon=":material/download:", width="stretch")
 
 st.space("small")
+c1, c2 = st.columns([1, 2])
+status_colors = {"Order now": ui.BAD, "Order this week": ui.WARN, "Plan order": ui.LAST_YEAR, "Healthy": ui.GOOD}
+fig = go.Figure(go.Pie(labels=counts.index, values=counts.values, hole=0.62, sort=False,
+                       marker=dict(colors=[status_colors[s] for s in counts.index], line=dict(width=0)),
+                       textinfo="value", hovertemplate="%{label}: %{value} products<extra></extra>"))
+fig.add_annotation(text=f"<b>{len(plan)}</b><br>products", showarrow=False, font=dict(size=16))
+ui.show(ui.style(fig, "Stock status", height=360, hover="closest"), c1)
+fig = go.Figure()
+for status, g in plan.groupby("status", observed=True):
+    fig.add_scatter(x=g["days_of_cover"], y=g["revenue"], mode="markers", name=str(status),
+                    marker=dict(size=np.clip(np.sqrt(g["order_qty"] + 1) * 1.6, 8, 46), color=status_colors[str(status)],
+                                opacity=0.75, line=dict(width=1, color="rgba(255,255,255,0.5)")),
+                    customdata=np.stack([g["product_name"], g["order_qty"]], axis=1),
+                    hovertemplate="<b>%{customdata[0]}</b><br>%{x} days of cover · revenue %{y:,.0f}"
+                                  "<br>order %{customdata[1]:,.0f} units<extra></extra>")
+fig.add_vline(x=float(review), line_dash="dot", line_color=ui.HIST, annotation_text="next order cycle")
+ui.style(fig, "Risk map · days of cover vs forecast revenue (bubble = order size)", height=360, hover="closest")
+fig.update_xaxes(title_text="Days of cover", rangemode="tozero")
+fig.update_yaxes(title_text=f"Forecast revenue ({ui.currency()})")
+ui.show(fig, c2)
+
 c1, c2 = st.columns(2)
 cat = daily.groupby([pd.Grouper(key="date", freq="W"), "category"])["forecast"].sum().reset_index()
 fig = go.Figure()
