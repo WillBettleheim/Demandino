@@ -527,6 +527,61 @@ class DemandForecaster:
         return ForecastResult(pd.DatetimeIndex(feats["_date"]), mean, lo, hi, ext.price[t], ext.promo[t],
                               float(feats["_level"].iloc[0]), self.level_uncertainty)
 
+    EXPLAIN_GROUPS = {
+        "Weekday": ["dow"],
+        "Time of year": ["month", "dom", "doy_sin", "doy_cos"],
+        "Holidays & peak days": ["bf_window", "days_to_xmas", "is_xmas", "holiday", "days_to_holiday",
+                                 "days_after_holiday"],
+        "Price & promotion": ["promo", "rel_price", "price_vs_hist"],
+        "Same season last year": ["ly_ratio", "cat_ly_ratio"],
+        "Days ahead": ["gap"],
+    }
+
+    def explain_day(self, ctx: SeriesContext, start: pd.Timestamp, horizon: int, price_plan: np.ndarray,
+                    regular_plan: np.ndarray, promo_plan: np.ndarray, day: int, level_override: float | None = None,
+                    driver_plan: dict | None = None) -> tuple[float, float, list[tuple[str, float]]]:
+        """Why day `day` of the horizon differs from an average day of the horizon.
+
+        Each group of inputs is swapped for the values of every other horizon day and the average change in
+        the forecast is that group's contribution (an interventional, SHAP-like estimate). Returns
+        (forecast for the day, average day, [(group, units)] including an interaction remainder).
+        """
+        n = len(ctx.units)
+        first = int((start - ctx.start).days)
+        t = np.arange(first, first + horizon)
+        span = t[-1] + 1
+        ext = SeriesContext(units=ctx.units, price=_extend(ctx.price[:n], span, first, price_plan),
+                            regular=_extend(ctx.regular[:n], span, first, regular_plan),
+                            promo=_extend(ctx.promo[:n], span, first, promo_plan).astype(int), start=ctx.start,
+                            category=ctx.category, price_index=ctx.price_index, cat_units=ctx.cat_units,
+                            drivers=self.driver_matrix(ctx.start, span, driver_plan))
+        feats = self._featurise(ext, t, t - np.minimum(t - (n - 1), MAX_GAP))
+        if level_override is not None:
+            feats["_level"] = level_override
+            feats["log_level"] = np.log1p(level_override)
+        lvl = feats["_level"].to_numpy()[0] + 0.5
+        X = feats[self.features].reset_index(drop=True)
+
+        def pred(frame: pd.DataFrame) -> np.ndarray:
+            return np.clip(self.models["mean"].predict(frame) * lvl * self.bias_factor, 0, None)
+
+        base = pred(X)
+        target, average = float(base[day]), float(base.mean())
+        groups = dict(self.EXPLAIN_GROUPS)
+        if self.driver_names:
+            groups["Outside factors"] = [f"drv_{d}" for d in self.driver_names]
+        out = []
+        row = X.iloc[[day]]
+        for name, cols in groups.items():
+            cols = [c for c in cols if c in X]
+            if not cols:
+                continue
+            mod = pd.concat([row] * len(X), ignore_index=True)
+            mod[cols] = X[cols].to_numpy()
+            out.append((name, target - float(pred(mod).mean())))
+        out.append(("Interactions & other", target - average - sum(v for _, v in out)))
+        return target, average, out
+
     def forecast_product(self, pid: str, horizon: int, start: pd.Timestamp | None = None,
                          price: float | np.ndarray | None = None, regular_price: float | None = None,
                          promo_plan: np.ndarray | None = None, discount_plan: np.ndarray | None = None) -> ForecastResult:
