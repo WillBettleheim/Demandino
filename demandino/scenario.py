@@ -39,6 +39,7 @@ class ForecastInputs:
     lead: int = 14
     review: int = 14
     service: float = 0.95
+    driver_plan: tuple = ()  # (driver name, planned future value) for outside factors
 
 
 @dataclass
@@ -62,6 +63,7 @@ class ScenarioResult:
     drivers: list[tuple[str, float]]
     last_year: np.ndarray | None
     insights: list[str] = field(default_factory=list)
+    explain_args: dict = field(default_factory=dict)  # what the day explainer needs to re-run the model
 
     @property
     def confidence(self) -> str:
@@ -153,7 +155,7 @@ def compute(fc: DemandForecaster, sales: pd.DataFrame, elasticities: tuple[dict,
         """ML forecast at the reference price (seasonality, promos, level); the regular-price change from the
         reference is applied with the product's price elasticity, then events and launch ramp-up."""
         r = fc.forecast_context(ctx, start, horizon, ref_price * (1 - disc_ * promo_), np.full(horizon, ref_price),
-                                promo_, level_override=level_override)
+                                promo_, level_override=level_override, driver_plan=dict(inp.driver_plan) or None)
         r.level_uncertainty = unc
         k = (reg / ref_price) ** elasticity
         if adjust:
@@ -196,6 +198,9 @@ def compute(fc: DemandForecaster, sales: pd.DataFrame, elasticities: tuple[dict,
     recent_daily = recent if history is not None and len(history) else None
     result = ScenarioResult(inp, res, base, history, method, elasticity, profile, total, low, high, revenue, profit,
                             recent_daily, inv, promo_effect, sens, drivers, last_year)
+    result.explain_args = dict(ctx=ctx, start=start, horizon=horizon, price_plan=ref_price * (1 - disc * promo),
+                               regular_plan=np.full(horizon, ref_price), promo_plan=promo,
+                               level_override=level_override, driver_plan=dict(inp.driver_plan) or None)
     if not detail:
         return result
     result.insights = build_insights(res, inp.cost, recent_daily, promo_effect, inv, sens, price, profile, method)
@@ -254,3 +259,33 @@ def default_events() -> pd.DataFrame:
     return pd.DataFrame({"event": pd.Series([], dtype="object"), "start": pd.Series([], dtype="object"),
                          "end": pd.Series([], dtype="object"), "change": pd.Series([], dtype="float")})
 
+
+
+def inputs_to_json(inp: ForecastInputs) -> dict:
+    """A JSON-safe copy of the inputs (for saving scenarios; no pickling)."""
+    d = dict(inp.__dict__)
+    d["start"] = inp.start.strftime("%Y-%m-%d")
+    d["promo_dates"] = [str(x) for x in inp.promo_dates] if inp.promo_dates else None
+    d["events"] = [[n, str(s), str(e), c] for n, s, e, c in inp.events]
+    d["driver_plan"] = [list(x) for x in inp.driver_plan]
+    if inp.history is not None:
+        h = inp.history[["date", "units_sold", "price", "promo"]].copy()
+        h["date"] = h["date"].dt.strftime("%Y-%m-%d")
+        d["history"] = h.to_dict(orient="list")
+    return d
+
+
+def inputs_from_json(d: dict) -> ForecastInputs:
+    d = dict(d)
+    known = set(ForecastInputs.__dataclass_fields__)
+    d = {k: v for k, v in d.items() if k in known}
+    d["start"] = pd.Timestamp(d["start"])
+    d["promo_dates"] = tuple(pd.Timestamp(x).date() for x in d["promo_dates"]) if d.get("promo_dates") else None
+    d["events"] = tuple((str(n), pd.Timestamp(s).date(), pd.Timestamp(e).date(), float(c))
+                        for n, s, e, c in d.get("events") or [])
+    d["driver_plan"] = tuple(tuple(x) for x in d.get("driver_plan") or [])
+    if d.get("history"):
+        h = pd.DataFrame(d["history"])
+        h["date"] = pd.to_datetime(h["date"])
+        d["history"] = h
+    return ForecastInputs(**d)
