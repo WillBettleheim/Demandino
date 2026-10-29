@@ -177,7 +177,7 @@ div[data-testid="stMetricValue"] {font-family: "Space Grotesk", Inter, sans-seri
 [data-testid="stLayoutWrapper"]:has(> .st-key-fc_kpis) {container-type: inline-size;}
 .st-key-fc_kpis {display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .75rem;
   align-items: stretch;}
-@container (max-width: 760px) { .st-key-fc_kpis {grid-template-columns: repeat(2, minmax(0, 1fr));} }
+@container (max-width: 640px) { .st-key-fc_kpis {grid-template-columns: repeat(2, minmax(0, 1fr));} }
 .st-key-fc_kpis > div {width: auto !important; min-width: 0; height: 100%;}
 .st-key-fc_kpis div[data-testid="stMetric"] {height: 100%; display: flex; flex-direction: column; container-type: inline-size;}
 .st-key-fc_kpis div[data-testid="stMetricValue"] {font-size: clamp(1.35rem, 15cqi, 2.1rem);}
@@ -485,5 +485,5 @@ def gauge(value: float, title: str, suffix: str = "%", max_value: float = 100, g
                                             threshold=dict(line=dict(color=GOOD, width=3), value=good_below)
                                             if good_below else None)))
     style(fig, title, height=height, legend=False, hover="closest")
-    fig.update_layout(margin=dict(l=20, r=20, t=50, b=0))
+    fig.update_layout(margin=dict(l=28, r=28, t=50, b=0))  # room for the end tick labels on narrow screens
     return fig
