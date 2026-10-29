@@ -91,3 +91,33 @@ def test_theme_toggle_emits_switch_script():
     at.segmented_control(key="dm_theme").set_value("light").run()
     assert not at.exception, at.exception
     assert any("stActiveTheme" in h.proto.body for h in at.get("html"))
+
+
+SIGNED_IN_PAGES = ["views/workspace.py", "views/connections.py", "views/orders.py", "views/tracking.py",
+                   "views/hierarchy.py", "views/assistant.py"]
+
+
+@pytest.mark.parametrize("page", SIGNED_IN_PAGES)
+def test_workspace_pages_signed_in(page):
+    from demandino import db
+    import secrets as _s
+    uid = db.create_user("u" + _s.token_hex(4), "a very long password")
+    at = _new_app()
+    at.session_state["user_id"] = uid
+    at.run()
+    at.switch_page(page).run()
+    assert not at.exception, at.exception
+
+
+def test_share_link_renders_without_terms():
+    from demandino import db
+    uid = db.create_user("sharer_test", "a very long password")
+    summary = {"product": "Mug", "horizon_days": 30, "forecast_start": "2026-11-01", "expected_units": 120,
+               "range_95": [80, 160], "revenue": 1200, "gross_profit": 500, "confidence": "High",
+               "category": "Kitchen", "weekly_units": {"2026-11-02": 30.0, "2026-11-09": 31.0}, "findings": ["**A:** b"]}
+    token = db.create_share(uid, "Mug forecast", {"summary": summary, "currency": "$"})
+    at = AppTest.from_file("../app.py", default_timeout=60)
+    at.query_params["share"] = token
+    at.run()
+    assert not at.exception, at.exception
+    assert any("Mug forecast" in h.proto.body for h in at.get("html"))
