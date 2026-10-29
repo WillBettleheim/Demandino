@@ -1,0 +1,61 @@
+{
+  "generated": "2026-10-29 03:20",
+  "results": [
+    {
+      "dataset": "REAL \u00b7 UCI Online Retail II",
+      "products": 40,
+      "test_start": "2011-09-11",
+      "test_end": "2011-12-09",
+      "WAPE (daily)": 0.8629331508112735,
+      "WAPE (weekly)": 0.4654838512260218,
+      "Bias": 0.14308152563226267,
+      "Daily miss rate": 0.05298651252408482,
+      "Weekly miss rate": 0.025000000000000022,
+      "Range coverage target": 0.95,
+      "Baseline WAPE: recent average": 0.8956541378377217,
+      "Baseline WAPE: same day last year": 1.1773154426158579
+    },
+    {
+      "dataset": "REAL \u00b7 UCI Online Retail II",
+      "products": 40,
+      "test_start": "2011-06-13",
+      "test_end": "2011-09-10",
+      "WAPE (daily)": 0.9174222412386636,
+      "WAPE (weekly)": 0.5285668211202773,
+      "Bias": 0.09489685512792644,
+      "Daily miss rate": 0.06151315789473688,
+      "Weekly miss rate": 0.033333333333333326,
+      "Range coverage target": 0.95,
+      "Baseline WAPE: recent average": 1.0051714845377335,
+      "Baseline WAPE: same day last year": 1.221579779427974
+    },
+    {
+      "dataset": "SIMULATED sample",
+      "products": 30,
+      "test_start": "2026-07-31",
+      "test_end": "2026-10-28",
+      "WAPE (daily)": 0.3688164967711716,
+      "WAPE (weekly)": 0.17819647051952162,
+      "Bias": -0.0781330876406041,
+      "Daily miss rate": 0.05629629629629629,
+      "Weekly miss rate": 0.050000000000000044,
+      "Range coverage target": 0.95,
+      "Baseline WAPE: recent average": 0.4504633998291796,
+      "Baseline WAPE: same day last year": 0.5731922840705413
+    },
+    {
+      "dataset": "SIMULATED sample",
+      "products": 30,
+      "test_start": "2026-05-02",
+      "test_end": "2026-07-30",
+      "WAPE (daily)": 0.37223827295362366,
+      "WAPE (weekly)": 0.16619207897796778,
+      "Bias": 0.019118364571394247,
+      "Daily miss rate": 0.03592592592592592,
+      "Weekly miss rate": 0.008333333333333304,
+      "Range coverage target": 0.95,
+      "Baseline WAPE: recent average": 0.4329380789858605,
+      "Baseline WAPE: same day last year": 0.5739931740614335
+    }
+  ]
+}
