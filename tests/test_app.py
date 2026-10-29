@@ -84,3 +84,10 @@ def test_advisor_uses_forecast_page_product():
     at.switch_page("views/advisor.py").run()
     assert not at.exception, at.exception
     assert "Growth advisor" in _text(at)
+
+
+def test_theme_toggle_emits_switch_script():
+    at = _forecast_app()
+    at.segmented_control(key="dm_theme").set_value("light").run()
+    assert not at.exception, at.exception
+    assert any("stActiveTheme" in h.proto.body for h in at.get("html"))
