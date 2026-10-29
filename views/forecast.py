@@ -151,8 +151,10 @@ st.session_state["last_inputs"] = inputs  # lets the Grow demand page analyse th
 
 # ======================================================================= results
 with right:
+    # Only visible when the panels stack and the inputs move below the results (see ui.py).
+    st.html('<div class="dm-stack-hint">↓ Change the product, price and plans further down the page.</div>')
     if new and basis == "history" and history_df is None:
-        st.info("Upload the product's sales history in the panel on the left, or pick another basis.",
+        st.info("Upload the product's sales history in the input panel, or pick another basis.",
                 icon=":material/upload_file:")
         st.stop()
     if history_df is not None and history_df["date"].max() >= start:

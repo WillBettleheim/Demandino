@@ -184,7 +184,16 @@ div[data-testid="stMetricValue"] {font-family: "Space Grotesk", Inter, sans-seri
 .st-key-fc_kpis div[data-testid="stMetricValue"] > div {overflow: visible; text-overflow: clip;}
 
 /* Forecast page: input panel + results wrap onto separate rows when space is tight. */
+.st-key-fc_layout {container-type: inline-size;}
 .st-key-fc_layout > div > [data-testid="stHorizontalBlock"] {flex-wrap: wrap; row-gap: 1rem;}
+/* Once the panels stack (phones, tablets, split screens), show the forecast first and the inputs below it. */
+.st-key-fc_layout [data-testid="stElementContainer"]:has(.dm-stack-hint) {display: none;}
+.dm-stack-hint {font-size: .82rem; color: var(--ink-2); padding: .45rem .8rem; border-radius: .7rem;
+  border: 1px dashed var(--edge-hi); background: var(--glass);}
+@container (max-width: 880px) {
+  .st-key-fc_layout > div > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:last-child {order: -1;}
+  .st-key-fc_layout [data-testid="stElementContainer"]:has(.dm-stack-hint) {display: block;}
+}
 .st-key-fc_layout > div > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child
   {flex: 1 1 300px !important; width: auto !important; min-width: 0;}
 .st-key-fc_layout > div > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:last-child
