@@ -1,0 +1,118 @@
+# Demandino: ML demand forecasting
+
+Demandino predicts how many units a product will sell, day by day. It learns sales patterns from your history
+(trend, weekday and yearly seasonality, holidays, price and promotion effects) and gives a detailed analysis
+of each forecast.
+
+## Run it
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/streamlit run app.py
+```
+
+The app opens with a realistic **sample dataset** (30 products, 6 categories, 3 years of daily sales). To use
+your own data, choose **Upload my CSV** in the sidebar. You can download a template from the same place.
+
+| column | required | notes |
+|---|---|---|
+| `date` | ✓ | one row per product per day (missing days count as 0 sales) |
+| `product_id` | ✓ | or `product_name` / `sku` |
+| `units_sold` | ✓ | also accepts `quantity`, `units`, `qty`, `sales` |
+| `price` | ✓ | actual selling price that day |
+| `product_name`, `category` | | |
+| `regular_price` | | inferred from recent price ceiling if missing |
+| `promo` | | 0/1; inferred from price < regular price if missing |
+
+## Pages
+
+- **Forecast a product.** Inputs sit in a panel on the left and results update live:
+  - **Product:** an existing product, or a new one estimated from its category and price, a similar product, or
+    a short sales history you upload. New launches can have a ramp-up period.
+  - **Plans:** price, cost, horizon, promotions (recurring, specific dates, Black Friday) and demand events such
+    as campaigns or closures.
+  - **Inventory:** stock on hand, lead time, days between orders and service level.
+
+  Results include expected units with an 80% range, revenue, profit, a confidence label and key findings. Tabs
+  cover the forecast (with last year overlaid), a drivers waterfall, weekly and monthly breakdowns, price and
+  promotion what-ifs, an inventory plan, sales patterns, saved scenarios compared side by side, and an Excel or
+  CSV export.
+- **Demand planning.** Forecasts every product at once from an editable table of stock and lead times. Each
+  product gets a status, a run-out date, an order-by date and an order quantity, and you can download a
+  purchase list.
+- **Grow demand.** Tests the levers you control by re-running the model with one change at a time: regular price,
+  promotion depth and frequency, the best week to promote, and staying in stock. It ranks the options by profit
+  and finds the most profitable tested plan that reaches a sales goal. General good-practice ideas the model
+  can't measure (listings, reviews, bundles, channels) are listed separately.
+- **Explore sales patterns.** Trend, seasonality, weekday × month heatmap, year-over-year, promo lift, price
+  elasticity, unusual-day detection and product comparison.
+- **Portfolio overview.** Revenue by category, category growth, ABC × XYZ segmentation and momentum.
+- **Model accuracy.** A back-test on the last 90 days compared with simple baselines, plus error by weeks ahead
+  and by category, and feature importance.
+
+The first run trains the model (about 10 seconds) and saves it in `.cache/`, so later runs start instantly.
+
+## Terms & data handling
+
+The app asks you to accept terms & conditions before first use (see `demandino/legal.py`, and the Terms page
+in the app). They are a general template, not legal advice; have them reviewed before offering the app to
+customers. Uploaded files are processed in memory and never written to disk. See [SECURITY.md](SECURITY.md).
+
+## Accuracy on real data
+
+The model is tested on real sales from the [UCI Online Retail II](https://archive.ics.uci.edu/dataset/502/online+retail+ii)
+dataset: a UK online gift wholesaler, Dec 2009 – Dec 2011, using its 40 most regularly sold products (CC BY 4.0).
+Pick **Real store** in the sidebar to use it in the app.
+
+A "miss" is a day (or a product-week) where actual sales landed outside the predicted range. Each test window
+is 90 days the model never saw during training or calibration. Days the whole shop was closed are excluded.
+
+| Data | Unseen test window | Daily misses | Weekly misses | Daily WAPE (simple average) |
+|---|---|---|---|---|
+| Real · UCI | 10 Sep – 9 Dec 2011 | 5.3% | 2.5% | 86% (90%) |
+| Real · UCI | 12 Jun – 10 Sep 2011 | 6.2% | 3.3% | 92% (101%) |
+| Simulated | 30 Jul – 28 Oct 2026 | 5.6% | 5.0% | 37% (45%) |
+| Simulated | 1 May – 30 Jul 2026 | 3.6% | 0.8% | 37% (43%) |
+
+Point error (WAPE) is a separate question from range reliability. A single product's daily sales are noisy,
+and on the wholesaler's lumpy orders the point error stays high. The ranges are honest about that rather than
+precise.
+
+To reproduce:
+
+```bash
+.venv/bin/python -I scripts/prepare_uci.py data/raw/online_retail_ii/online_retail_II.xlsx data/uci_online_retail_daily.csv 40
+.venv/bin/python scripts/benchmark.py
+```
+
+The first command needs the dataset zip from the UCI link above, unzipped into `data/raw/online_retail_ii/`.
+
+## How the model works (`demandino/model.py`)
+
+- **One global model for all products.** A scikit-learn `HistGradientBoostingRegressor` is trained on every
+  product at once. Each training row asks: "standing at day *o* with this history, what sells on day *o + gap*?"
+  This is a direct multi-horizon forecast with no recursive error build-up.
+- **Features:**
+  - the recent demand level and momentum
+  - demand in the same season last year, for both the product and its category
+  - discount depth, price compared with the recent average and with category peers, and the promo flag
+  - calendar features: weekday, annual cycle, Black Friday weekend, days to Christmas
+- **Scale-free target.** The model predicts units ÷ recent level, using a Poisson loss weighted by level. This
+  lets a product selling 3 units a day and one selling 300 share patterns.
+- **Uncertainty.** Quantile models (p5 and p95) give the daily range. The range is then conformally calibrated:
+  a model trained without the latest 180 days forecasts them from several start dates, and the range is widened
+  or narrowed until 95% of real outcomes fall inside. Multi-day totals include a level error calibrated the same
+  way.
+- **Price changes.** Promotional discounts are learned by the ML model. Permanent regular-price changes use each
+  product's own price elasticity (a log-log regression controlling for promo, weekday, month and trend), shrunk
+  toward its category. Tree models can't extrapolate prices reliably.
+- **New products.** A cold-start model (category and price positioning to demand level), a similar product
+  rescaled for price, or your expected daily sales. A launch ramp-up curve is optional.
+
+## Tests
+
+```bash
+.venv/bin/pip install pytest
+.venv/bin/python -m pytest -q tests
+```
