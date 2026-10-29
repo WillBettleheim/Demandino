@@ -4,6 +4,8 @@ from __future__ import annotations
 import streamlit as st
 
 TERMS_VERSION = "1.0 · 29 October 2026"
+COOKIE = "dm_terms"
+COOKIE_VALUE = "v1.0-2026-10-29"  # remembers acceptance in this browser (e.g. across a light/dark reload)
 
 TERMS_MD = """
 **Please read these terms before using Demandino.** By ticking *I accept* you agree to them.
@@ -56,8 +58,31 @@ def terms_markdown() -> str:
     return TERMS_MD.replace("{version}", TERMS_VERSION)
 
 
+def _cookie_ok() -> bool:
+    try:
+        return st.context.cookies.get(COOKIE) == COOKIE_VALUE
+    except Exception:  # noqa: BLE001 - no browser context (tests)
+        return False
+
+
 def accepted() -> bool:
-    return st.session_state.get("terms_accepted") == TERMS_VERSION
+    if st.session_state.get("terms_accepted") == TERMS_VERSION:
+        return True
+    if _cookie_ok() and not st.session_state.get("terms_withdrawn"):
+        st.session_state["terms_accepted"] = TERMS_VERSION
+        return True
+    return False
+
+
+def sync_cookie() -> None:
+    """Write or clear the acceptance cookie after the user accepts or withdraws."""
+    action = st.session_state.pop("_terms_cookie", None)
+    if action == "set":
+        st.html(f"<script>document.cookie = '{COOKIE}={COOKIE_VALUE}; Max-Age=31536000; Path=/; SameSite=Strict';"
+                "</script>", unsafe_allow_javascript=True)
+    elif action == "clear":
+        st.html(f"<script>document.cookie = '{COOKIE}=; Max-Age=0; Path=/; SameSite=Strict';</script>",
+                unsafe_allow_javascript=True)
 
 
 def gate() -> bool:
@@ -71,5 +96,7 @@ def gate() -> bool:
     agree = st.checkbox("I have read and accept the terms & conditions", key="terms_checkbox")
     if st.button("Continue to Demandino", type="primary", disabled=not agree, icon=":material/arrow_forward:"):
         st.session_state["terms_accepted"] = TERMS_VERSION
+        st.session_state["terms_withdrawn"] = False
+        st.session_state["_terms_cookie"] = "set"
         st.rerun()
     return False
