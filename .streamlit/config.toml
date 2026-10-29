@@ -1,0 +1,49 @@
+[server]
+headless = true
+# Security: cap uploads, keep XSRF/CORS protection on, and don't watch files in production.
+maxUploadSize = 25
+maxMessageSize = 50
+enableXsrfProtection = true
+enableCORS = true
+runOnSave = false
+
+[client]
+# Show users a short error message, never source code or stack traces.
+showErrorDetails = "type"
+toolbarMode = "viewer"
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "dark"
+font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+headingFont = "Sora:https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&display=swap"
+baseRadius = "0.85rem"
+buttonRadius = "0.7rem"
+showWidgetBorder = true
+metricValueFontWeight = 700
+chartCategoricalColors = ["#8B7CFF", "#FF8A3D", "#38BDF8", "#34D399", "#F472B6", "#FACC15", "#A78BFA", "#94A3B8"]
+
+[theme.dark]
+primaryColor = "#8B7CFF"
+backgroundColor = "#07080F"
+secondaryBackgroundColor = "#121525"
+textColor = "#ECEEF7"
+borderColor = "#23284180"
+linkColor = "#B3A8FF"
+
+[theme.dark.sidebar]
+backgroundColor = "#0A0C17"
+secondaryBackgroundColor = "#141830"
+borderColor = "#1F2440"
+
+[theme.light]
+primaryColor = "#6D5BF0"
+backgroundColor = "#FBFBFE"
+secondaryBackgroundColor = "#F1F0FB"
+textColor = "#14162A"
+borderColor = "#E4E2F3"
+
+[theme.light.sidebar]
+backgroundColor = "#F5F4FC"
