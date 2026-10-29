@@ -1,16 +1,16 @@
 {
-  "generated": "2026-10-29 03:20",
+  "generated": "2026-10-29 12:16",
   "results": [
     {
       "dataset": "REAL \u00b7 UCI Online Retail II",
       "products": 40,
       "test_start": "2011-09-11",
       "test_end": "2011-12-09",
-      "WAPE (daily)": 0.8629331508112735,
-      "WAPE (weekly)": 0.4654838512260218,
-      "Bias": 0.14308152563226267,
-      "Daily miss rate": 0.05298651252408482,
-      "Weekly miss rate": 0.025000000000000022,
+      "WAPE (daily)": 0.8572379527569868,
+      "WAPE (weekly)": 0.4761965308438236,
+      "Bias": 0.11319439649490712,
+      "Daily miss rate": 0.045279383429672415,
+      "Weekly miss rate": 0.022916666666666696,
       "Range coverage target": 0.95,
       "Baseline WAPE: recent average": 0.8956541378377217,
       "Baseline WAPE: same day last year": 1.1773154426158579
@@ -20,11 +20,11 @@
       "products": 40,
       "test_start": "2011-06-13",
       "test_end": "2011-09-10",
-      "WAPE (daily)": 0.9174222412386636,
-      "WAPE (weekly)": 0.5285668211202773,
-      "Bias": 0.09489685512792644,
-      "Daily miss rate": 0.06151315789473688,
-      "Weekly miss rate": 0.033333333333333326,
+      "WAPE (daily)": 0.9022815353506671,
+      "WAPE (weekly)": 0.5168768868883103,
+      "Bias": 0.10371960205811626,
+      "Daily miss rate": 0.051315789473684204,
+      "Weekly miss rate": 0.03125,
       "Range coverage target": 0.95,
       "Baseline WAPE: recent average": 1.0051714845377335,
       "Baseline WAPE: same day last year": 1.221579779427974
@@ -34,28 +34,28 @@
       "products": 30,
       "test_start": "2026-07-31",
       "test_end": "2026-10-28",
-      "WAPE (daily)": 0.3688164967711716,
-      "WAPE (weekly)": 0.17819647051952162,
-      "Bias": -0.0781330876406041,
-      "Daily miss rate": 0.05629629629629629,
-      "Weekly miss rate": 0.050000000000000044,
+      "WAPE (daily)": 0.3626193153403086,
+      "WAPE (weekly)": 0.16138350463210674,
+      "Bias": -0.027032545751230444,
+      "Daily miss rate": 0.04185185185185181,
+      "Weekly miss rate": 0.019444444444444486,
       "Range coverage target": 0.95,
-      "Baseline WAPE: recent average": 0.4504633998291796,
-      "Baseline WAPE: same day last year": 0.5731922840705413
+      "Baseline WAPE: recent average": 0.4638235717122564,
+      "Baseline WAPE: same day last year": 0.5784665970868854
     },
     {
       "dataset": "SIMULATED sample",
       "products": 30,
       "test_start": "2026-05-02",
       "test_end": "2026-07-30",
-      "WAPE (daily)": 0.37223827295362366,
-      "WAPE (weekly)": 0.16619207897796778,
-      "Bias": 0.019118364571394247,
-      "Daily miss rate": 0.03592592592592592,
-      "Weekly miss rate": 0.008333333333333304,
+      "WAPE (daily)": 0.3858705793378176,
+      "WAPE (weekly)": 0.18853592327016194,
+      "Bias": 0.03639168530956948,
+      "Daily miss rate": 0.05481481481481476,
+      "Weekly miss rate": 0.011111111111111072,
       "Range coverage target": 0.95,
-      "Baseline WAPE: recent average": 0.4329380789858605,
-      "Baseline WAPE: same day last year": 0.5739931740614335
+      "Baseline WAPE: recent average": 0.4496825957703993,
+      "Baseline WAPE: same day last year": 0.5763959851400522
     }
   ]
 }
