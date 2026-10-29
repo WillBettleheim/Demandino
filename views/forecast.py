@@ -1,4 +1,5 @@
 import pickle
+from statistics import NormalDist
 
 import numpy as np
 import pandas as pd
@@ -154,7 +155,8 @@ with right:
         f"{r.inputs.name} · next {horizon} days from {start:%d %b %Y}", ui.num(r.total), "units expected",
         f"{RANGE_LABEL} range <b>{ui.num(r.low)} – {ui.num(r.high)}</b> · {ui.num(per_day, 1)} per day{vs_recent}",
         [(f"{r.confidence} confidence", conf_cls), (r.inputs.category, ""), stock_chip,
-         (f"In testing, {A.backtest['metrics']['Daily miss rate']:.1%} of real days fell outside the range", "violet")])
+         (f"In testing, {A.backtest['metrics']['Daily miss rate']:.1%} of real days fell outside the range", "acc")],
+        count=(r.total, "fc_total", 0))
 
     weekly = pd.Series(res.mean, index=res.dates).resample("W").sum()
     with st.container(horizontal=True, vertical_alignment="bottom"):
@@ -208,9 +210,44 @@ with right:
         ui.show(ui.style(fig, "Average by weekday", height=290, legend=False, hover="closest"), c1)
         fig = go.Figure()
         fig.add_scatter(x=res.dates, y=np.cumsum(res.mean), name="Cumulative forecast", line=dict(color=ui.FC),
-                        fill="tozeroy", fillcolor="rgba(249,115,22,0.10)")
+                        fill="tozeroy", fillcolor="rgba(249,115,80,0.12)", line_shape="spline")
+        fig.add_scatter(x=res.dates, y=np.cumsum(res.mean * res.price), name="Cumulative revenue", yaxis="y2",
+                        line=dict(color=ui.BRAND, dash="dot"), line_shape="spline")
         fig.add_hline(y=inputs.stock, line_dash="dash", line_color=ui.HIST, annotation_text="current stock")
-        ui.show(ui.style(fig, "Cumulative units vs stock", height=290, legend=False), c2)
+        ui.style(fig, "Cumulative units & revenue", height=290,
+                 yaxis2=dict(overlaying="y", side="right", showgrid=False, tickprefix=ui.currency(), rangemode="tozero"))
+        ui.show(fig, c2)
+
+        c1, c2 = st.columns(2)
+        f = r.frame()
+        f["week"] = f["date"] - pd.to_timedelta(f["date"].dt.day_of_week, unit="D")
+        cal = f.pivot_table(index="week", columns=f["date"].dt.day_of_week, values="forecast", aggfunc="sum")
+        cal = cal.reindex(columns=range(7))
+        fig = go.Figure(go.Heatmap(z=cal.T.values, x=cal.index, y=DOW_NAMES, colorscale=ui.SEQ, xgap=3, ygap=3,
+                                   hovertemplate="Week of %{x|%d %b} · %{y}: %{z:,.1f} units<extra></extra>",
+                                   colorbar=dict(thickness=8, len=0.8)))
+        ui.style(fig, "Demand calendar · units per day", height=300, legend=False, hover="closest")
+        fig.update_yaxes(autorange="reversed")
+        ui.show(fig, c1)
+        # Chance of selling at least N units over the horizon, from the forecast's total range.
+        dist = NormalDist(r.total, max((r.high - r.total) / res.z, 1e-9))
+        lo_x = max(0.0, min(r.low * 0.7, inputs.stock * 0.9))
+        hi_x = max(r.high * 1.15, min(inputs.stock * 1.1, r.high * 3))
+        xs = np.linspace(lo_x, hi_x, 140)
+        prob = np.array([1 - dist.cdf(x) for x in xs]) * 100
+        cover = dist.cdf(inputs.stock) * 100
+        fig = go.Figure()
+        ui.glow_line(fig, xs, prob, ui.BRAND, "Chance", hovertemplate="≥ %{x:,.0f} units: %{y:.0f}%<extra></extra>")
+        if lo_x <= inputs.stock <= hi_x:
+            fig.add_vline(x=inputs.stock, line_dash="dash", line_color=ui.FC, annotation_text="your stock",
+                          annotation_position="top right")
+        ui.style(fig, f"Chance of selling at least N units in {horizon} days", height=300, legend=False,
+                 hover="closest")
+        fig.update_yaxes(ticksuffix="%", range=[0, 102])
+        fig.update_xaxes(title_text="Units", range=[lo_x, hi_x])
+        ui.show(fig, c2)
+        c2.caption(f"Your stock of {ui.num(inputs.stock)} units covers the whole horizon's demand with about "
+                   f"**{cover:.0f}%** probability.")
 
     with tabs[1]:
         labels = [d[0] for d in r.drivers] + ["Forecast"]
