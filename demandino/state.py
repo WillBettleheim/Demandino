@@ -7,6 +7,7 @@ data is never written to disk, and in-memory caches for uploads are bounded and 
 from __future__ import annotations
 
 import hashlib
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -16,19 +17,25 @@ import pandas as pd
 import streamlit as st
 
 from .analysis import elasticities
+from . import account, db
 from .data import generate_sample_data, prepare_sales, template_csv
 from .model import LEVEL_WINDOW, DemandForecaster, backtest
-from .security import UploadError, check_sales_limits, dump_signed, load_signed, read_csv_upload
+from .security import UploadError, check_sales_limits, clean_text, dump_signed, load_signed, read_csv_upload
 
-MODEL_VERSION = 6
+MODEL_VERSION = 7
+COUNTRIES = {"None": "No public holidays", "US": "United States", "GB": "United Kingdom", "IN": "India",
+             "CA": "Canada", "AU": "Australia", "DE": "Germany", "FR": "France", "ES": "Spain", "IT": "Italy",
+             "NL": "Netherlands", "IE": "Ireland", "BR": "Brazil", "MX": "Mexico", "JP": "Japan", "CN": "China",
+             "SG": "Singapore", "AE": "United Arab Emirates", "SA": "Saudi Arabia", "ZA": "South Africa",
+             "NG": "Nigeria", "KE": "Kenya", "NZ": "New Zealand", "PK": "Pakistan", "BD": "Bangladesh"}
 ROOT = Path(__file__).resolve().parent.parent
 CACHE_DIR = ROOT / ".cache"
 REAL_DATA = ROOT / "data" / "uci_online_retail_daily.csv"
 
 
 def _disk_cached(name: str, data_key: str, build: Callable[[], object]) -> object:
-    if data_key.startswith("upload-"):
-        return build()  # user data stays in memory only
+    if data_key.startswith(("upload-", "ws-")):
+        return build()  # models of user data stay in memory only
     path = CACHE_DIR / f"{name}-{data_key}-v{MODEL_VERSION}.pkl"
     if path.exists():
         try:
@@ -65,14 +72,17 @@ def _load_upload(content: bytes) -> pd.DataFrame:
 
 @st.cache_resource(show_spinner="Training the forecasting model on all products (first run only)…", max_entries=6,
                    ttl=6 * 3600)
-def _model(data_key: str, _sales: pd.DataFrame) -> DemandForecaster:
-    return _disk_cached("model", data_key, lambda: DemandForecaster(_sales).fit())
+def _model(data_key: str, _sales: pd.DataFrame, _country: str | None, _drivers: pd.DataFrame | None
+           ) -> DemandForecaster:
+    return _disk_cached("model", data_key,
+                        lambda: DemandForecaster(_sales, country=_country, drivers=_drivers).fit())
 
 
 @st.cache_resource(show_spinner="Back-testing the model on the last 90 days (first run only)…", max_entries=6,
                    ttl=6 * 3600)
-def _backtest(data_key: str, _sales: pd.DataFrame) -> dict:
-    return _disk_cached("backtest", data_key, lambda: backtest(_sales, holdout_days=90))
+def _backtest(data_key: str, _sales: pd.DataFrame, _country: str | None, _drivers: pd.DataFrame | None) -> dict:
+    return _disk_cached("backtest", data_key,
+                        lambda: backtest(_sales, holdout_days=90, country=_country, drivers=_drivers))
 
 
 @st.cache_data(show_spinner=False, max_entries=6, ttl=6 * 3600)
@@ -85,14 +95,20 @@ class AppState:
     sales: pd.DataFrame
     data_key: str
     source: str
+    country: str | None = None
+    drivers: pd.DataFrame | None = None
 
     @property
     def fc(self) -> DemandForecaster:
-        return _model(self.data_key, self.sales)
+        return _model(self.data_key, self.sales, self.country, self.drivers)
 
     @property
     def backtest(self) -> dict:
-        return _backtest(self.data_key, self.sales)
+        return _backtest(self.data_key, self.sales, self.country, self.drivers)
+
+    @property
+    def user_id(self) -> int | None:
+        return account.current_user()
 
     @property
     def elasticities(self) -> tuple[dict[str, float], dict[str, float]]:
@@ -123,20 +139,37 @@ class AppState:
         return self.sales[self.sales["product_id"] == pid].sort_values("date")
 
 
+def _read_drivers(content: bytes) -> pd.DataFrame:
+    d = read_csv_upload(content, max_rows=10_000)
+    d.columns = [str(c).strip().lower().replace(" ", "_") for c in d.columns]
+    if "date" not in d:
+        raise UploadError("The drivers file needs a `date` column plus 1–5 numeric columns.")
+    d["date"] = pd.to_datetime(d["date"], errors="coerce").dt.normalize()
+    d = d.dropna(subset=["date"]).groupby("date").mean(numeric_only=True)
+    d = d.select_dtypes("number").iloc[:, :5]
+    if d.empty:
+        raise UploadError("No numeric driver columns found.")
+    d.columns = [re.sub(r"[^a-z0-9_]", "", c)[:24] or f"driver{i}" for i, c in enumerate(d.columns)]
+    return d
+
+
 def sidebar_data_source() -> AppState | None:
     """Render the data-source controls in the sidebar and return the active dataset."""
+    uid = account.current_user()
     with st.sidebar:
         st.markdown("**Data**")
         options = ["Sample", "Real store", "My CSV"] if REAL_DATA.exists() else ["Sample", "My CSV"]
+        if uid is not None:
+            options.append("Workspace")
         source = st.segmented_control("Sales data", options, default="Sample", required=True,
                                       key="data_source", label_visibility="collapsed")
-        sales, key = None, None
+        sales, key, default_country = None, None, "None"
         if source == "My CSV":
             up = st.file_uploader("Daily sales CSV", type=["csv"], key="upload")
             st.download_button("Download CSV template", template_csv(), "sales_template.csv", "text/csv",
                                icon=":material/download:", width="stretch")
             st.caption("Required: `date, product_id, units_sold, price`. Optional: `product_name, category, "
-                       "regular_price, promo`. One row per product per day.")
+                       "regular_price, promo, on_hand` (stock on hand helps spot stock-outs).")
             if up is not None:
                 content = up.getvalue()
                 try:
@@ -146,28 +179,77 @@ def sidebar_data_source() -> AppState | None:
                     st.error(str(exc)[:300])
                 except Exception:  # noqa: BLE001 - never show internals for a bad file
                     st.error("That file could not be processed. Check it matches the template.")
+                if sales is not None and uid is not None:
+                    name = st.text_input("Save as", up.name.rsplit(".", 1)[0][:60], max_chars=60, key="save_name")
+                    if st.button("Save to my workspace", icon=":material/cloud_upload:", width="stretch"):
+                        try:
+                            db.save_dataset(uid, clean_text(name) or "My data", sales, "upload")
+                            st.toast("Saved. Pick **Workspace** above to use it any time.", icon=":material/check:")
+                        except db.AuthError as exc:
+                            st.error(str(exc))
+        elif source == "Workspace":
+            saved = db.list_datasets(uid)
+            if saved.empty:
+                st.caption("No saved datasets yet. Upload a CSV (My CSV) or connect a store on the **Workspace** "
+                           "page, then save it here.")
+            else:
+                ds = st.selectbox("Saved dataset", saved["id"].tolist(), key="dataset_id",
+                                  format_func=lambda i: f"{saved.set_index('id').loc[i, 'name']} · "
+                                                        f"{saved.set_index('id').loc[i, 'products']} products")
+                sales = _load_saved(uid, int(ds), float(saved.set_index("id").loc[ds, "created"]))
+                key = f"ws-{uid}-{ds}"
+                default_country = db.get_setting(uid, f"country:{ds}", "None")
         elif source == "Real store":
             mtime = REAL_DATA.stat().st_mtime
-            sales, key = _load_real(mtime), f"real-{int(mtime)}"
+            sales, key, default_country = _load_real(mtime), f"real-{int(mtime)}", "GB"
             st.caption("Real sales of a UK online gift wholesaler (Dec 2009 – Dec 2011), 40 best-selling products. "
                        "Source: [UCI Online Retail II](https://archive.ics.uci.edu/dataset/502/online+retail+ii), "
                        "CC BY 4.0.")
         else:
             end = (pd.Timestamp.today().normalize() - pd.Timedelta(days=1)).strftime("%Y-%m-%d")
-            sales, key = _load_sample(end), f"sample-{end}"
+            sales, key, default_country = _load_sample(end), f"sample-{end}", "US"
             st.caption("Simulated store: 30 products, 6 categories, 3 years of daily sales.")
         if sales is not None:
             st.caption(f"{sales['product_id'].nunique()} products · {sales['date'].min():%d %b %Y} → "
                        f"{sales['date'].max():%d %b %Y}")
-        st.selectbox("Currency", ["$", "€", "£", "₹", "¥", "₦", "R", "A$"], key="currency")
+
+        codes = list(COUNTRIES)
+        country = st.selectbox("Country (public holidays)", codes, index=codes.index(default_country),
+                               format_func=lambda c: f"{COUNTRIES[c]}" + ("" if c == "None" else f" · {c}"),
+                               key=f"country_{key}", help="Holidays of this country are used by the model.")
+        if source == "Workspace" and sales is not None and country != default_country:
+            db.set_setting(uid, f"country:{st.session_state['dataset_id']}", country)
+        drivers = None
+        with st.expander("Outside factors (optional)", icon=":material/thermostat:"):
+            st.caption("Daily values that move demand — ad spend, temperature, search interest… CSV with `date` and "
+                       "up to 5 numeric columns. Include future dates you already know (e.g. planned ad budget).")
+            dfile = st.file_uploader("Drivers CSV", type=["csv"], key=f"drivers_{key}", label_visibility="collapsed")
+            if dfile is not None:
+                try:
+                    drivers = _read_drivers(dfile.getvalue())
+                    st.caption(f"Using {', '.join(drivers.columns)} ({len(drivers)} days).")
+                except (UploadError, ValueError) as exc:
+                    st.error(str(exc)[:300])
+        cur = st.selectbox("Currency", ["$", "€", "£", "₹", "¥", "₦", "R", "A$"], key="currency")
+        if uid is not None:
+            db.set_setting(uid, "currency", cur)
 
     if sales is None:
-        st.info("Upload a daily sales CSV in the sidebar, or switch to the sample dataset.", icon=":material/upload:")
+        st.info("Choose or upload sales data in the sidebar.", icon=":material/upload:")
         return None
     if sales.groupby("product_id")["date"].count().max() < LEVEL_WINDOW + 30:
         st.error(f"Need at least {LEVEL_WINDOW + 30} days of history for at least one product to train the model.")
         return None
-    return AppState(sales=sales, data_key=key, source=source)
+    country = None if country == "None" else country
+    full_key = f"{key}-{country or 'none'}"
+    if drivers is not None:
+        full_key += "-drv" + hashlib.md5(pd.util.hash_pandas_object(drivers).values.tobytes()).hexdigest()[:10]
+    return AppState(sales=sales, data_key=full_key, source=source, country=country, drivers=drivers)
+
+
+@st.cache_data(show_spinner=False, max_entries=4, ttl=3600)
+def _load_saved(uid: int, dataset_id: int, created: float) -> pd.DataFrame | None:
+    return db.load_dataset(uid, dataset_id)
 
 
 def app() -> AppState:
