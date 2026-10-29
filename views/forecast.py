@@ -186,12 +186,21 @@ with right:
                  if r.recent_daily else "")
     stock_chip = ((f"Stock runs out {inv['stockout_date']:%d %b} · {inv['days_of_cover']} days", "bad")
                   if inv["stockout_date"] is not None else ("Stock covers the horizon", "good"))
+    # How well the model forecast this very product over the held-out test period (all products for new ones).
+    pp = A.backtest["per_product"].set_index("product_id")
+    if r.inputs.pid in pp.index:
+        row = pp.loc[r.inputs.pid]
+        off = row["total_error_%"]
+        track = (f"Track record: {row['miss_rate']:.0%} of test days outside the range · 90-day total "
+                 f"{'within' if abs(off) < 0.5 else 'off by'} {abs(off):.0f}%".replace("within 0%", "spot on"),
+                 "good" if row["miss_rate"] <= 0.07 and abs(off) <= 15 else "warn")
+    else:
+        track = (f"In testing, {A.backtest['metrics']['Daily miss rate']:.1%} of real days fell outside the range", "acc")
     ui.spotlight(
         f"{r.inputs.name} · next {horizon} days from {start:%d %b %Y}", ui.num(r.total), "units expected",
         f"{RANGE_LABEL} range <b>{ui.num(r.low)} – {ui.num(r.high)}</b> · {ui.num(per_day, 1)} per day{vs_recent}",
         [(f"{r.confidence} confidence", conf_cls), (r.inputs.category, ""), stock_chip]
-        + ([(f"{dtype} demand", "warn" if dtype in ("Intermittent", "Lumpy") else "")] if dtype else []) + [
-         (f"In testing, {A.backtest['metrics']['Daily miss rate']:.1%} of real days fell outside the range", "acc")],
+        + ([(f"{dtype} demand", "warn" if dtype in ("Intermittent", "Lumpy") else "")] if dtype else []) + [track],
         count=(r.total, "fc_total", 0))
 
     weekly = pd.Series(res.mean, index=res.dates).resample("W").sum()
