@@ -37,7 +37,9 @@ FEATURES = [
     "category", "gap", "log_level", "trend_ratio", "level_cv", "ly_ratio", "cat_ly_ratio",
     "rel_price", "price_vs_hist", "price_index", "promo",
     "dow", "month", "dom", "doy_sin", "doy_cos", "bf_window", "days_to_xmas", "is_xmas",
+    "holiday", "days_to_holiday", "days_after_holiday",
 ]
+MAX_DRIVERS = 5
 FEATURE_LABELS = {
     "category": "Product category", "gap": "Days ahead", "log_level": "Recent demand level",
     "trend_ratio": "Recent momentum (trend)", "level_cv": "Demand volatility", "ly_ratio": "Same season last year (product)",
@@ -45,11 +47,71 @@ FEATURE_LABELS = {
     "price_vs_hist": "Price vs recent average price", "price_index": "Price vs category peers", "promo": "Promotion flag",
     "dow": "Day of week", "month": "Month", "dom": "Day of month", "doy_sin": "Season (annual cycle)",
     "doy_cos": "Season (annual cycle, phase)", "bf_window": "Black Friday weekend", "days_to_xmas": "Days until Christmas",
-    "is_xmas": "Christmas Day",
+    "is_xmas": "Christmas Day", "holiday": "Public holiday", "days_to_holiday": "Days until next holiday",
+    "days_after_holiday": "Days since last holiday",
 }
 
 
-def calendar_features(dates: pd.DatetimeIndex) -> pd.DataFrame:
+def holiday_dates(country: str | None, years: range) -> frozenset:
+    """Public holidays for a country (ISO code such as "US", "GB", "IN"); empty when no country is set."""
+    if not country:
+        return frozenset()
+    import holidays  # imported lazily: only needed when a country is chosen
+
+    try:
+        return frozenset(pd.Timestamp(d) for d in holidays.country_holidays(country, years=list(years)))
+    except (NotImplementedError, KeyError):
+        return frozenset()
+
+
+def detect_stockouts(units: np.ndarray, closed: np.ndarray | None = None, on_hand: np.ndarray | None = None,
+                     min_run: int = 3, min_level: float = 2.0) -> tuple[np.ndarray, np.ndarray]:
+    """Flag likely stock-out days and estimate the demand that sales on those days could not show.
+
+    A stock-out is a run of at least `min_run` zero-sales trading days for a product that normally sells
+    `min_level`+ units a day, or any day with stock on hand <= 0 when that is known. Returns (flags,
+    unconstrained demand), where demand equals sales except on flagged days.
+    """
+    u = pd.Series(np.asarray(units, dtype=float))
+    closed = np.zeros(len(u), bool) if closed is None else np.asarray(closed, bool)
+    flags = np.zeros(len(u), bool)
+    if on_hand is not None:
+        flags |= np.nan_to_num(np.asarray(on_hand, dtype=float), nan=1.0) <= 0
+    base = u.where(~closed).rolling(29, center=True, min_periods=7).mean().to_numpy()
+    arr = u.to_numpy()
+    i, n = 0, len(arr)
+    while i < n:
+        if arr[i] == 0 and not closed[i]:
+            j, run = i, []
+            while j < n and (arr[j] == 0 or closed[j]):
+                if not closed[j]:
+                    run.append(j)
+                j += 1
+            if len(run) >= min_run and np.nanmean(base[run]) >= min_level:
+                flags[run] = True
+            i = j
+        else:
+            i += 1
+    flags &= ~closed
+    typical = u.where(~flags & ~pd.Series(closed)).rolling(29, center=True, min_periods=5).mean()
+    typical = typical.ffill().bfill().fillna(0.0).to_numpy()
+    demand = np.where(flags, typical, u.to_numpy())
+    return flags, demand
+
+
+def demand_class(units: np.ndarray) -> tuple[str, float, float]:
+    """Syntetos–Boylan demand type: Smooth, Erratic, Intermittent or Lumpy (with ADI and CV²)."""
+    u = np.asarray(units, dtype=float)
+    nz = u[u > 0]
+    if len(nz) < 2:
+        return "Intermittent", float("inf"), 0.0
+    adi = len(u) / len(nz)
+    cv2 = float((nz.std() / nz.mean()) ** 2)
+    kind = ("Smooth" if cv2 < 0.49 else "Erratic") if adi < 1.32 else ("Intermittent" if cv2 < 0.49 else "Lumpy")
+    return kind, float(adi), cv2
+
+
+def calendar_features(dates: pd.DatetimeIndex, hol: frozenset = frozenset()) -> pd.DataFrame:
     dates = pd.DatetimeIndex(dates)
     doy = dates.day_of_year.to_numpy()
     bf = np.zeros(len(dates), dtype=int)
@@ -68,7 +130,23 @@ def calendar_features(dates: pd.DatetimeIndex) -> pd.DataFrame:
         "bf_window": bf,
         "days_to_xmas": to_xmas,
         "is_xmas": ((dates.month == 12) & (dates.day == 25)).astype(int),
+        **_holiday_columns(dates, hol),
     })
+
+
+def _holiday_columns(dates: pd.DatetimeIndex, hol: frozenset) -> dict:
+    n = len(dates)
+    if not hol:
+        return {"holiday": np.zeros(n), "days_to_holiday": np.full(n, 15.0), "days_after_holiday": np.full(n, 8.0)}
+    h = np.array(sorted(hol), dtype="datetime64[D]")
+    d = dates.to_numpy().astype("datetime64[D]")
+    idx = np.searchsorted(h, d)
+    nxt = np.where(idx < len(h), (h[np.minimum(idx, len(h) - 1)] - d).astype(int), 999)
+    prv = np.where(idx > 0, (d - h[np.maximum(idx - 1, 0)]).astype(int), 999)
+    is_h = nxt == 0
+    prv = np.where(is_h, 0, prv)
+    return {"holiday": is_h.astype(float), "days_to_holiday": np.clip(nxt, 0, 15).astype(float),
+            "days_after_holiday": np.clip(prv, 0, 8).astype(float)}
 
 
 def _window_mean(csum: np.ndarray, end: np.ndarray, length: int) -> np.ndarray:
@@ -93,9 +171,12 @@ class SeriesContext:
     category: str
     price_index: float         # regular price / category median regular price
     cat_units: np.ndarray | None = None  # category mean daily units aligned to start, history only
+    drivers: np.ndarray | None = None    # external drivers (days × k) for history + future, aligned to start
 
 
-def featurise(ctx: SeriesContext, t_idx: np.ndarray, o_idx: np.ndarray, cat_codes: dict[str, int]) -> pd.DataFrame:
+def featurise(ctx: SeriesContext, t_idx: np.ndarray, o_idx: np.ndarray, cat_codes: dict[str, int],
+              hol: frozenset = frozenset(), driver_names: tuple = (), driver_sd: np.ndarray | None = None
+              ) -> pd.DataFrame:
     """Build feature rows for targets t_idx forecast from origins o_idx (indices into the series)."""
     t_idx = np.asarray(t_idx)
     o_idx = np.asarray(o_idx)
@@ -129,7 +210,7 @@ def featurise(ctx: SeriesContext, t_idx: np.ndarray, o_idx: np.ndarray, cat_code
         cat_ly = np.full(len(t_idx), np.nan)
 
     dates = ctx.start + pd.to_timedelta(t_idx, unit="D")
-    cal = calendar_features(pd.DatetimeIndex(dates))
+    cal = calendar_features(pd.DatetimeIndex(dates), hol)
     price_t = ctx.price[t_idx]
     feats = pd.DataFrame({
         "category": float(cat_codes[ctx.category]) if ctx.category in cat_codes else np.nan,
@@ -145,6 +226,14 @@ def featurise(ctx: SeriesContext, t_idx: np.ndarray, o_idx: np.ndarray, cat_code
         "promo": ctx.promo[t_idx].astype(float),
     })
     feats = pd.concat([feats, cal], axis=1)
+    if driver_names and ctx.drivers is not None:
+        # Each driver as its change from the recent average at the origin, in units of its overall spread.
+        d = ctx.drivers
+        for k, name in enumerate(driver_names):
+            col = np.nan_to_num(d[:, k].astype(float))
+            cs = np.concatenate([[0.0], np.cumsum(col[: len(units)])])
+            base = _window_mean(cs, o_idx, LEVEL_WINDOW)
+            feats[f"drv_{name}"] = (col[t_idx] - base) / (driver_sd[k] if driver_sd is not None else 1.0)
     feats["_level"] = level
     feats["_date"] = dates
     return feats
@@ -200,6 +289,9 @@ class DemandForecaster:
     gaps_per_day: int = 2
     max_iter: int = 350
     seed: int = 0
+    country: str | None = None              # public holidays of this country become model features
+    drivers: pd.DataFrame | None = None     # optional daily external drivers (index: date, numeric columns)
+    stockout_correction: bool = True        # learn from estimated demand on suspected stock-out days
     cat_codes: dict[str, int] = field(init=False, default_factory=dict)
     cat_median_price: dict[str, float] = field(init=False, default_factory=dict)
     cat_series: dict[str, pd.Series] = field(init=False, default_factory=dict)
@@ -212,6 +304,9 @@ class DemandForecaster:
     level_uncertainty: float = field(init=False, default=0.12)  # calibrated for multi-day totals
     calibration: dict = field(init=False, default_factory=dict)
     features: list = field(init=False, default_factory=lambda: list(FEATURES))
+    holidays: frozenset = field(init=False, default=frozenset())
+    driver_names: tuple = field(init=False, default=())
+    driver_sd: np.ndarray | None = field(init=False, default=None)
 
     # ------------------------------------------------------------------ setup
     def __post_init__(self) -> None:
@@ -223,6 +318,47 @@ class DemandForecaster:
         self.cat_series = self._category_series()
         shop = self.sales.groupby("date")["units_sold"].sum()
         self.closed_dates = set(shop[shop == 0].index) if self.sales["product_id"].nunique() >= 5 else set()
+        years = range(self.sales["date"].min().year - 1, self.sales["date"].max().year + 3)
+        self.holidays = holiday_dates(self.country, years)
+        self._mark_stockouts()
+        if self.drivers is not None and len(self.drivers.columns):
+            d = self.drivers.select_dtypes("number").iloc[:, :MAX_DRIVERS]
+            d.index = pd.to_datetime(d.index).normalize()
+            self.drivers = d.sort_index()
+            self.driver_names = tuple(str(c) for c in d.columns)
+            self.driver_sd = np.maximum(d.std().fillna(1.0).to_numpy(float), 1e-9)
+
+    def _mark_stockouts(self) -> None:
+        """Add `stockout` and `demand` columns (demand = sales, except estimated on stock-out days)."""
+        parts = []
+        for _, g in self.sales.groupby("product_id", sort=False):
+            closed = g["date"].isin(self.closed_dates).to_numpy()
+            on_hand = g["on_hand"].to_numpy() if "on_hand" in g else None
+            if "stockout" in g:
+                flags = g["stockout"].fillna(0).astype(bool).to_numpy()
+                _, dem = detect_stockouts(g["units_sold"].to_numpy(), closed, on_hand=np.where(flags, 0, 1))
+            else:
+                flags, dem = detect_stockouts(g["units_sold"].to_numpy(), closed, on_hand)
+            if not self.stockout_correction:
+                dem = g["units_sold"].to_numpy(float)
+            parts.append(pd.DataFrame({"stockout": flags, "demand": dem}, index=g.index))
+        marks = pd.concat(parts)
+        self.sales["stockout"] = marks["stockout"]
+        self.sales["demand"] = marks["demand"]
+
+    def driver_matrix(self, start: pd.Timestamp, n: int, plan: dict | None = None) -> np.ndarray | None:
+        """Drivers for n days from `start`; future days use `plan` values or the last 28-day average."""
+        if not self.driver_names:
+            return None
+        idx = pd.date_range(start, periods=n, freq="D")
+        d = self.drivers.reindex(idx)
+        recent = self.drivers.tail(28).mean()
+        for name in self.driver_names:
+            if plan and name in plan and plan[name] is not None:
+                future = idx > self.drivers.index.max()
+                d.loc[future, name] = float(plan[name])
+            d[name] = d[name].ffill().fillna(recent[name])
+        return d.to_numpy(float)
 
     def _category_series(self) -> dict[str, pd.Series]:
         out = {}
@@ -246,12 +382,16 @@ class DemandForecaster:
         g = g[g["product_id"] == pid].sort_values("date")
         start, end = g["date"].iloc[0], g["date"].iloc[-1]
         cat = g["category"].iloc[0]
+        units = g["demand"] if "demand" in g else g["units_sold"]
         return SeriesContext(
-            units=g["units_sold"].to_numpy(float), price=g["price"].to_numpy(float),
+            units=units.to_numpy(float), price=g["price"].to_numpy(float),
             regular=g["regular_price"].to_numpy(float), promo=g["promo"].to_numpy(int), start=start,
             category=cat, price_index=self.price_index(cat, float(g["regular_price"].median())),
-            cat_units=self._cat_units(cat, start, end),
+            cat_units=self._cat_units(cat, start, end), drivers=self.driver_matrix(start, len(g)),
         )
+
+    def _featurise(self, ctx: SeriesContext, t: np.ndarray, o: np.ndarray) -> pd.DataFrame:
+        return featurise(ctx, t, o, self.cat_codes, self.holidays, self.driver_names, self.driver_sd)
 
     # --------------------------------------------------------------- training
     def _training_rows(self, cutoff: pd.Timestamp | None) -> pd.DataFrame:
@@ -271,7 +411,11 @@ class DemandForecaster:
             o = t - gap
             keep = o >= LEVEL_WINDOW - 1
             t, o = t[keep], o[keep]
-            f = featurise(ctx, t, o, self.cat_codes)
+            if self.stockout_correction and "stockout" in sales:
+                so = sales.loc[sales["product_id"] == pid].sort_values("date")["stockout"].to_numpy(bool)
+                ok = ~so[t]  # never learn from days when sales could not show demand
+                t, o = t[ok], o[ok]
+            f = self._featurise(ctx, t, o)
             f["_y"] = ctx.units[t]
             parts.append(f)
         return pd.concat(parts, ignore_index=True)
@@ -280,7 +424,8 @@ class DemandForecaster:
         level = rows["_level"].to_numpy() + 0.5
         y = rows["_y"].to_numpy() / level
         # Short histories leave some features empty (e.g. no "last year" yet); the model skips them.
-        self.features = [f for f in FEATURES if rows[f].nunique() > 1]
+        candidates = FEATURES + [f"drv_{n}" for n in self.driver_names]
+        self.features = [f for f in candidates if f in rows and rows[f].nunique() > 1]
         X = rows[self.features]
         cat_mask = [f == "category" for f in self.features]
         common = dict(max_iter=self.max_iter, learning_rate=0.05, max_leaf_nodes=31, min_samples_leaf=50,
@@ -356,7 +501,7 @@ class DemandForecaster:
 
     def forecast_context(self, ctx: SeriesContext, start: pd.Timestamp, horizon: int,
                          price_plan: np.ndarray, regular_plan: np.ndarray, promo_plan: np.ndarray,
-                         level_override: float | None = None) -> ForecastResult:
+                         level_override: float | None = None, driver_plan: dict | None = None) -> ForecastResult:
         """Forecast `horizon` days from `start` given the series history in ctx and future plans."""
         n = len(ctx.units)
         origin = n - 1
@@ -371,9 +516,10 @@ class DemandForecaster:
             regular=_extend(ctx.regular[:n], span, first, regular_plan),
             promo=_extend(ctx.promo[:n], span, first, promo_plan).astype(int),
             start=ctx.start, category=ctx.category, price_index=ctx.price_index, cat_units=ctx.cat_units,
+            drivers=self.driver_matrix(ctx.start, span, driver_plan),
         )
         gaps = np.minimum(t - origin, MAX_GAP)
-        feats = featurise(ext, t, t - gaps, self.cat_codes)
+        feats = self._featurise(ext, t, t - gaps)
         if level_override is not None:
             feats["_level"] = level_override
             feats["log_level"] = np.log1p(level_override)
@@ -455,7 +601,9 @@ class DemandForecaster:
         level = sample["_level"].to_numpy() + 0.5
         res = permutation_importance(self.models["mean"], sample[self.features], sample["_y"].to_numpy() / level,
                                      sample_weight=level, n_repeats=3, random_state=self.seed)
-        imp = pd.Series(res.importances_mean, index=[FEATURE_LABELS[f] for f in self.features])
+        imp = pd.Series(res.importances_mean,
+                        index=[FEATURE_LABELS.get(f, f"Driver: {f[4:]}" if f.startswith("drv_") else f)
+                               for f in self.features])
         return imp.clip(lower=0).sort_values(ascending=False)
 
 
