@@ -169,6 +169,16 @@ div[data-testid="stMetricValue"] {font-family: "Space Grotesk", Inter, sans-seri
 ::-webkit-scrollbar {width: 10px; height: 10px;}
 ::-webkit-scrollbar-thumb {background: var(--edge-hi); border-radius: 10px;}
 
+/* Headline KPI cards: an even grid, equal heights; 4 across, or 2 × 2 when the column is narrow. */
+[data-testid="stLayoutWrapper"]:has(> .st-key-fc_kpis) {container-type: inline-size;}
+.st-key-fc_kpis {display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .75rem;
+  align-items: stretch;}
+@container (max-width: 760px) { .st-key-fc_kpis {grid-template-columns: repeat(2, minmax(0, 1fr));} }
+.st-key-fc_kpis > div {width: auto !important; min-width: 0; height: 100%;}
+.st-key-fc_kpis div[data-testid="stMetric"] {height: 100%; display: flex; flex-direction: column; container-type: inline-size;}
+.st-key-fc_kpis div[data-testid="stMetricValue"] {font-size: clamp(1.35rem, 15cqi, 2.1rem);}
+.st-key-fc_kpis div[data-testid="stMetricValue"] > div {overflow: visible; text-overflow: clip;}
+
 /* Forecast page: input panel + results wrap onto separate rows when space is tight. */
 .st-key-fc_layout > div > [data-testid="stHorizontalBlock"] {flex-wrap: wrap; row-gap: 1rem;}
 .st-key-fc_layout > div > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child

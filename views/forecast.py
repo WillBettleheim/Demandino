@@ -203,18 +203,30 @@ with right:
         + ([(f"{dtype} demand", "warn" if dtype in ("Intermittent", "Lumpy") else "")] if dtype else []) + [track],
         count=(r.total, "fc_total", 0))
 
-    weekly = pd.Series(res.mean, index=res.dates).resample("W").sum()
-    with st.container(horizontal=True, vertical_alignment="bottom"):
+    days = r.frame().set_index("date")
+    weekly = days["forecast"].resample("W").sum()
+    weekly_rev = (days["forecast"] * res.price).resample("W").sum()
+    weekly_profit = (days["forecast"] * (res.price - r.inputs.cost)).resample("W").sum()
+    # One even grid of headline cards: same height, every card with its weekly trend line.
+    with st.container(horizontal=True, key="fc_kpis"):
         st.metric("Weekly demand", ui.num(weekly.max()), border=True, chart_data=weekly.round(1).tolist(),
                   chart_type="area", delta="peak week", delta_color="off", delta_arrow="off")
-        st.metric("Revenue", ui.money(r.revenue), border=True)
-        st.metric("Gross profit", ui.money(r.profit), border=True,
-                  delta=f"{r.profit / r.revenue * 100:.0f}% margin" if r.revenue else None, delta_color="off",
+        st.metric("Revenue", ui.short_money(r.revenue), border=True, chart_data=weekly_rev.round().tolist(),
+                  help=f"Exactly {ui.money(r.revenue)} over {horizon} days.",
+                  chart_type="area", delta=f"{ui.money(r.revenue / horizon)} a day", delta_color="off",
                   delta_arrow="off")
+        st.metric("Gross profit", ui.short_money(r.profit), border=True, chart_data=weekly_profit.round().tolist(),
+                  help=f"Exactly {ui.money(r.profit)}: revenue minus unit cost × units.",
+                  chart_type="bar", delta=f"{r.profit / r.revenue * 100:.0f}% margin" if r.revenue else None,
+                  delta_color="off", delta_arrow="off")
         st.metric("Order by", "Now" if inv["needs_order_now"] else
                   (f"{inv['reorder_by']:%d %b}" if inv["reorder_by"] is not None else "Not needed"), border=True,
-                  delta=f"{ui.num(inv['order_qty'])} units" if inv["reorder_by"] is not None else None,
-                  delta_color="off", delta_arrow="off")
+                  chart_data=np.maximum(r.inputs.stock - np.cumsum(res.mean), 0).round().tolist()
+                  if r.inputs.stock else None, chart_type="area",
+                  delta=f"{ui.num(inv['order_qty'])} units" if inv["reorder_by"] is not None else "stock is enough",
+                  delta_color="off", delta_arrow="off",
+                  help="The line shows stock on hand falling as the forecast sells through." if r.inputs.stock else None)
+    with st.container(horizontal=True, horizontal_alignment="right"):
         with st.popover("Save scenario", icon=":material/bookmark_add:"):
             sname = clean_text(st.text_input("Scenario name", f"{r.inputs.name} · {r.inputs.promo_kind.lower()} · "
                                              f"{ui.money(r.inputs.price, 2)}"[:MAX_TEXT], max_chars=MAX_TEXT))
