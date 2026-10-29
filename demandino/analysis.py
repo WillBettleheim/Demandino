@@ -275,3 +275,31 @@ def heatmap_month_dow(g: pd.DataFrame) -> pd.DataFrame:
     t.index = [MONTH_NAMES[m - 1] for m in t.index]
     t.columns = [DOW_NAMES[c] for c in t.columns]
     return t
+
+
+
+def promo_spillover(sales: pd.DataFrame, pid: str, min_days: int = 15, min_effect: float = 0.03) -> pd.DataFrame:
+    """How other products in the same category sell while `pid` is on promotion (cannibalization or halo).
+
+    For each sibling, compares its sales on days `pid` was promoted (and the sibling was not) with its own
+    typical level around those days. Effects smaller than `min_effect` or seen on fewer than `min_days` days
+    are reported as 0 (not distinguishable from noise).
+    """
+    me = sales[sales["product_id"] == pid].set_index("date")
+    if me.empty:
+        return pd.DataFrame(columns=["product_id", "product_name", "effect", "days", "daily_level", "price"])
+    cat = me["category"].iloc[0]
+    my_promo = me["promo"] == 1
+    rows = []
+    for oid, g in sales[(sales["category"] == cat) & (sales["product_id"] != pid)].groupby("product_id"):
+        g = g.set_index("date").sort_index()
+        normal = g["units_sold"].where(g["promo"] == 0)
+        typical = normal.rolling(29, center=True, min_periods=10).mean()
+        days = my_promo.reindex(g.index, fill_value=False) & (g["promo"] == 0) & (typical > 0)
+        n = int(days.sum())
+        eff = float((g.loc[days, "units_sold"] / typical[days]).mean() - 1) if n else 0.0
+        if n < min_days or abs(eff) < min_effect or not np.isfinite(eff):
+            eff = 0.0
+        rows.append({"product_id": oid, "product_name": g["product_name"].iloc[0], "effect": eff, "days": n,
+                     "daily_level": float(g["units_sold"].tail(56).mean()), "price": float(g["price"].tail(28).mean())})
+    return pd.DataFrame(rows)
