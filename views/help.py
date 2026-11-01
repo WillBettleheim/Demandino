@@ -35,6 +35,8 @@ PAGES = [
      "Forecasts added up for each category and the whole shop."),
     ("views/lifecycle.py", "Product life stages", ":material/timeline:",
      "Which products are launching, growing, mature, declining or at the end — and what that means for stock."),
+    ("views/together.py", "Bought together", ":material/shopping_basket:",
+     "Products customers buy in the same order — ideas for bundles and suggestions (needs order lines)."),
     ("views/assistant.py", "Ask Demandino", ":material/auto_awesome:",
      "Ask questions about a forecast in plain language."),
     ("views/datacheck.py", "Data check", ":material/rule:",
