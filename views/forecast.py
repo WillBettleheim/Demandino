@@ -1,3 +1,4 @@
+import dataclasses
 import pickle
 from statistics import NormalDist
 
@@ -114,12 +115,14 @@ with left:
             promo_dates = st.date_input("Promo period", (start + pd.Timedelta(days=14), start + pd.Timedelta(days=20)),
                                         key="fc_pdates")
 
-    with ui.card("events"), st.expander("**:material/event: Demand events** · optional"):
-        st.caption("Something coming up that past sales can't show? Add a row: a marketing campaign (+30%), a store "
-                   "closure (−100%), a competitor launch (−15%)…")
+    with ui.card("events"), st.expander("**:material/tune: Your adjustments** · optional"):
+        st.caption("Know something past sales can't show? Add a row with the reason and the % change: a marketing "
+                   "campaign (+30%), a store closure (−100%), a competitor launch (−15%)…  \n"
+                   "Track the forecast (Export tab) and Demandino will later show whether your adjustments made it "
+                   "more accurate than the model alone.")
         events_df = st.data_editor(
             default_events(), num_rows="dynamic", key="fc_events", width="stretch", hide_index=True,
-            column_config={"event": st.column_config.TextColumn("Event", default="Campaign"),
+            column_config={"event": st.column_config.TextColumn("Reason", default="Campaign", max_chars=60),
                            "start": st.column_config.DateColumn("Start", min_value=start.date()),
                            "end": st.column_config.DateColumn("End", min_value=start.date()),
                            "change": st.column_config.NumberColumn("Change %", min_value=-100, max_value=500,
@@ -530,9 +533,14 @@ with right:
         if A.user_id is not None:
             if c2.button("Track this forecast", icon=":material/track_changes:", width="stretch",
                          help="Compare it with real sales as they arrive (Forecast tracking page)."):
-                db.log_forecast(A.user_id, A.data_key, inputs.pid or f"new:{inputs.name}", inputs.name,
-                                {"dates": [d.strftime("%Y-%m-%d") for d in res.dates], "mean": res.mean.round(3).tolist(),
-                                 "lower": res.lower.round(3).tolist(), "upper": res.upper.round(3).tolist()})
+                payload = {"dates": [d.strftime("%Y-%m-%d") for d in res.dates], "mean": res.mean.round(3).tolist(),
+                           "lower": res.lower.round(3).tolist(), "upper": res.upper.round(3).tolist()}
+                if inputs.events:
+                    # Keep the model's own forecast too, so the Tracking page can score your adjustments.
+                    base = run_scenario(A.data_key, dataclasses.replace(inputs, events=()))
+                    payload["base_mean"] = base.res.mean.round(3).tolist()
+                    payload["adjustments"] = [[str(n), str(s_), str(e_), float(c)] for n, s_, e_, c in inputs.events]
+                db.log_forecast(A.user_id, A.data_key, inputs.pid or f"new:{inputs.name}", inputs.name, payload)
                 st.toast("Tracking — see the Forecast tracking page.", icon=":material/check:")
             if st.button("Create a share link (valid 7 days)", icon=":material/link:"):
                 token = db.create_share(A.user_id, f"{inputs.name} · {inputs.horizon}-day forecast",

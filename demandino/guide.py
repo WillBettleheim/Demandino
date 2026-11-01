@@ -86,8 +86,8 @@ GLOSSARY = {
     "Price elasticity": "How strongly demand reacts to price. −2 means a 10% price cut lifts units by about 20%.",
     "Promotion lift": "How much extra a discount sells on promotion days compared with normal days.",
     "Seasonality": "Patterns that repeat every year, such as a December peak or a summer dip.",
-    "Demand events": "Things you know are coming that the past can't show: a campaign, a store closure, a "
-                     "competitor launch. Enter them as a % change.",
+    "Your adjustments": "Things you know are coming that the past can't show: a campaign, a store closure, a "
+                        "competitor launch. Enter them as a % change; tracked forecasts later show whether they helped.",
     "Stock-out": "Days when a product had no stock. Sales were zero because nothing could be sold, not because "
                  "nobody wanted it, so the model ignores those days when learning.",
     "Miss rate": "How often real sales landed outside the predicted range in testing. Lower is better; the "

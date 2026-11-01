@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from demandino import account, db, ui
+from demandino import account, adjustments, db, ui
 from demandino.state import app
 
 A = app()
@@ -26,6 +26,8 @@ for lg in logs:
     p = lg["payload"]
     f = pd.DataFrame({"date": pd.to_datetime(p["dates"]), "forecast": p["mean"], "lower": p["lower"],
                       "upper": p["upper"]})
+    if "base_mean" in p:
+        f["model"] = p["base_mean"]
     act = A.sales[A.sales["product_id"] == lg["product_id"]].set_index("date")["units_sold"]
     f["actual"] = act.reindex(f["date"]).to_numpy()
     seen = f.dropna(subset=["actual"])
@@ -57,13 +59,41 @@ st.dataframe(t.drop(columns=["same_data"]), hide_index=True, width="stretch", co
     "miss_rate": st.column_config.NumberColumn("Days outside range", format="percent"),
     "wape": st.column_config.NumberColumn("Error (WAPE)", format="percent")})
 
+st.subheader("Did your adjustments help?")
+scored = adjustments.score(logs, A.sales)
+summ = adjustments.summary(scored)
+if summ is None:
+    st.caption("Add adjustments on the Forecast page (**Your adjustments**), track the forecast, and once real sales "
+               "arrive for those days you'll see here whether your judgement beat the model.")
+else:
+    better = summ["error_change"] < 0
+    ui.spotlight("Your adjustments vs the model alone", f"{abs(summ['error_change']):.0%}",
+                 "less error" if better else "more error",
+                 f"On the days your adjustments applied, they {'cut' if better else 'added'} forecast error "
+                 f"({ui.num(summ['model_error'])} → {ui.num(summ['your_error'])} units off). "
+                 f"<b>{summ['helped']}</b> helped, <b>{summ['hurt']}</b> made it worse, "
+                 f"{summ['adjustments'] - summ['helped'] - summ['hurt']} made no real difference.",
+                 [("Keep adjusting like this", "good")] if better else
+                 [("Trust the model more for these cases", "warn")])
+    st.dataframe(scored.drop(columns=["log_id"]), hide_index=True, width="stretch", column_config={
+        "product": "Product", "adjustment": "Reason", "change_%": st.column_config.NumberColumn("Change", format="%+.0f%%"),
+        "start": st.column_config.DateColumn("From", format="D MMM"), "end": st.column_config.DateColumn("To", format="D MMM"),
+        "days_scored": "Days with sales", "actual": st.column_config.NumberColumn("Sold", format="%,.0f"),
+        "model_forecast": st.column_config.NumberColumn("Model said", format="%,.0f"),
+        "your_forecast": st.column_config.NumberColumn("You said", format="%,.0f"),
+        "model_error": st.column_config.NumberColumn("Model error", format="%,.0f"),
+        "your_error": st.column_config.NumberColumn("Your error", format="%,.0f"), "verdict": "Verdict"})
+
+st.subheader("Inspect a forecast")
 pick = st.selectbox("Inspect", t["id"].tolist(), format_func=lambda i: f"{t.set_index('id').loc[i, 'product']} · made "
                                                                        f"{t.set_index('id').loc[i, 'made']:%d %b %Y}")
 f = series[pick]
 fig = go.Figure()
 fig.add_scatter(x=f["date"], y=f["upper"], line=dict(width=0), showlegend=False, hoverinfo="skip")
 fig.add_scatter(x=f["date"], y=f["lower"], fill="tonexty", fillcolor=ui.BAND, line=dict(width=0), name="Range")
-ui.glow_line(fig, f["date"], f["forecast"], ui.FC, "Forecast")
+ui.glow_line(fig, f["date"], f["forecast"], ui.FC, "Forecast" if "model" not in f else "Your adjusted forecast")
+if "model" in f:
+    fig.add_scatter(x=f["date"], y=f["model"], name="Model alone", line=dict(color=ui.HIST, dash="dot"))
 seen = f.dropna(subset=["actual"])
 inside = seen["actual"].between(seen["lower"], seen["upper"])
 fig.add_scatter(x=seen.loc[inside, "date"], y=seen.loc[inside, "actual"], mode="markers", name="Actual · inside",
