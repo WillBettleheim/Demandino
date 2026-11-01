@@ -5,8 +5,8 @@ from streamlit.testing.v1 import AppTest
 from demandino.legal import TERMS_VERSION
 
 PAGES = ["views/forecast.py", "views/planning.py", "views/advisor.py", "views/explore.py", "views/overview.py",
-         "views/accuracy.py", "views/alerts.py", "views/clearance.py", "views/targets.py", "views/help.py",
-         "views/terms.py"]
+         "views/accuracy.py", "views/alerts.py", "views/clearance.py", "views/targets.py", "views/datacheck.py",
+         "views/help.py", "views/terms.py"]
 
 
 def _new_app(accept: bool = True) -> AppTest:
