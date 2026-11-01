@@ -41,6 +41,9 @@ your own data, choose **Upload my CSV** in the sidebar. You can download a templ
 - **Demand planning.** Forecasts every product at once from an editable table of stock and lead times. Each
   product gets a status, a run-out date, an order-by date and an order quantity, and you can download a
   purchase list.
+- **Perishable stock.** Give products a shelf life on Demand planning. Stock likely to expire before it sells is
+  flagged (and left out of reorder timing), orders are capped to what can sell before expiring, and minimum-order
+  rules that force waste are called out. Expiry warnings also appear in the weekly digest.
 - **Grow demand.** Tests the levers you control by re-running the model with one change at a time: regular price,
   promotion depth and frequency, the best week to promote, and staying in stock. It ranks the options by profit
   and finds the most profitable tested plan that reaches a sales goal. General good-practice ideas the model
