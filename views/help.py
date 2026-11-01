@@ -17,6 +17,8 @@ PAGES = [
      "How many of one product will sell, and when to reorder it."),
     ("views/planning.py", "Demand planning", ":material/inventory:",
      "Order quantities for every product at once, within a budget."),
+    ("views/budget.py", "Buying budget", ":material/account_balance_wallet:",
+     "How much each month needs to spend on stock, against your budget."),
     ("views/advisor.py", "Grow demand", ":material/rocket_launch:",
      "Concrete ideas to sell more: price, promotions, timing and stock."),
     ("views/targets.py", "Sales targets", ":material/flag:",
