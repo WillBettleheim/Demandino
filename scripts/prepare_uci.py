@@ -1,11 +1,12 @@
-"""Convert UCI Online Retail II transactions into Demandino's daily sales format.
+"""Convert UCI Online Retail II transactions into Demandino's daily sales format, plus order baskets.
 
 Usage: python -I scripts/prepare_uci.py <online_retail_II.xlsx> <out.csv> [n_products]
 
 Real data from a UK online gift retailer (Dec 2009 – Dec 2011):
 https://archive.ics.uci.edu/dataset/502/online+retail+ii
 Cancellations, returns, postage/fees and zero-price lines are removed; the N products
-sold on the most days are kept. Categories are assigned from description keywords.
+sold on the most days are kept. Categories are assigned from description keywords. A second file,
+<out>_baskets.csv, lists which of those products were in each order (for the "bought together" analysis).
 """
 import re
 import sys
@@ -63,6 +64,12 @@ def main(src: str, out: str, n_products: int = 40) -> None:
     daily[cols].to_csv(out, index=False, date_format="%Y-%m-%d")
     print(f"{len(keep)} products, {daily['date'].min():%Y-%m-%d} → {daily['date'].max():%Y-%m-%d}, {len(daily)} rows")
     print(daily.groupby("category")["product_id"].nunique())
+
+    baskets = df[df["StockCode"].isin(keep)][["Invoice", "StockCode"]].drop_duplicates()
+    baskets.columns = ["order_id", "product_id"]
+    path = out.replace("_daily.csv", "_baskets.csv") if out.endswith("_daily.csv") else out + ".baskets.csv"
+    baskets.sort_values(["order_id", "product_id"]).to_csv(path, index=False)
+    print(f"{baskets['order_id'].nunique():,} orders with these products → {path}")
 
 
 if __name__ == "__main__":
