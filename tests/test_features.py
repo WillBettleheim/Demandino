@@ -505,3 +505,22 @@ def test_lost_sales_found_in_the_sample_shop(sales):
     fc = DemandForecaster(sales)
     rows = lostsales.daily(fc.sales)
     assert len(rows) > 0 and (rows["lost_units"] > 0).all() and rows["lost_sales"].sum() > 0
+
+
+# --------------------------------------------------------------- what-if
+def test_store_what_if_adds_up_and_responds_to_price(fc, sales):
+    from demandino import whatif
+    el = elasticities(sales)
+    pids = ["P001", "P002", "P011"]
+    none = whatif.run(fc, el, 0.15, pids, whatif.Change(), 30)
+    assert np.allclose(none["units_change"], 0) and np.allclose(none["profit_change"], 0)
+    up = whatif.run(fc, el, 0.15, pids, whatif.Change(price_change=0.10), 30)
+    assert (up["units_change"] < 0).all()  # dearer → fewer units
+    t = whatif.totals(up)
+    assert np.isclose(t["profit_change"], up["profit_change"].sum())
+    assert np.isclose(whatif.by_category(up)["profit_change"].sum(), t["profit_change"])
+    start = fc.sales["date"].max() + pd.Timedelta(days=5)
+    sale = whatif.run(fc, el, 0.15, pids, whatif.Change(discount=0.3, promo_start=start,
+                                                        promo_end=start + pd.Timedelta(days=6)), 30)
+    assert whatif.totals(sale)["units_change"] > 0  # a sale sells more units
+    assert whatif.verdict(whatif.totals(sale), sale, "$")[0].startswith("**Overall:**")
