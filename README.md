@@ -44,6 +44,8 @@ your own data, choose **Upload my CSV** in the sidebar. You can download a templ
 - **Perishable stock.** Give products a shelf life on Demand planning. Stock likely to expire before it sells is
   flagged (and left out of reorder timing), orders are capped to what can sell before expiring, and minimum-order
   rules that force waste are called out. Expiry warnings also appear in the weekly digest.
+- **Buying budget.** Open-to-buy by month and category: money needed for new stock to meet the forecast after
+  using stock on hand, against a monthly budget, with over-budget months flagged.
 - **Grow demand.** Tests the levers you control by re-running the model with one change at a time: regular price,
   promotion depth and frequency, the best week to promote, and staying in stock. It ranks the options by profit
   and finds the most profitable tested plan that reaches a sales goal. General good-practice ideas the model

@@ -24,9 +24,9 @@ LAST_YEAR = "#3B82F6"
 PALETTE = ["#14B8A6", "#F97350", "#3B82F6", "#F59E0B", "#EC4899", "#8B5CF6", "#22C55E", "#64748B"]
 SEQ = [[0, "rgba(20,184,166,0.06)"], [0.5, "#14B8A6"], [1, "#F97350"]]  # heatmaps
 
-PAGE_PATHS = ["/", "/planning", "/advisor", "/targets", "/whatif", "/alerts", "/changes", "/clearance", "/explore",
-              "/overview", "/hierarchy", "/lifecycle", "/together", "/lostsales", "/assistant", "/workspace",
-              "/datacheck", "/connections", "/orders", "/accuracy", "/tracking", "/help", "/terms"]
+PAGE_PATHS = ["/", "/planning", "/advisor", "/budget", "/targets", "/whatif", "/alerts", "/changes", "/clearance",
+              "/explore", "/overview", "/hierarchy", "/lifecycle", "/together", "/lostsales", "/assistant",
+              "/workspace", "/datacheck", "/connections", "/orders", "/accuracy", "/tracking", "/help", "/terms"]
 
 CSS = """
 <style>
