@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from demandino import adjustments, clearance, db, integrations as ig, monitor
-from demandino.analysis import elasticities, promo_spillover
+from demandino.analysis import elasticities, elasticity_effect, promo_spillover
 from demandino.data import generate_sample_data
 from demandino.model import DemandForecaster, demand_class, detect_bulk_orders, detect_stockouts, holiday_dates
 from demandino.pdf_report import scenario_pdf
@@ -209,3 +209,8 @@ def test_bulk_orders_are_flagged_and_added_back_as_an_allowance(sales):
 
     kept = DemandForecaster(spiked, max_iter=40, bulk_keep=frozenset({("P001", day.strftime("%Y-%m-%d"))}))
     assert not kept.sales.loc[row].iloc[0]["bulk"]
+
+
+def test_elasticity_wording_stays_true_for_positive_values():
+    assert "lifted units by about 23%" in elasticity_effect(-2.0)
+    assert "has not lifted units" in elasticity_effect(0.36)
