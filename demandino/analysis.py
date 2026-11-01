@@ -92,6 +92,15 @@ def abc_classes(sales: pd.DataFrame) -> pd.DataFrame:
     return by
 
 
+def elasticity_effect(e: float) -> str:
+    """What a 10% price cut has done to units, in words that stay true when the elasticity is positive."""
+    change = (0.9 ** e - 1) * 100
+    if e >= 0:
+        return (f"a 10% price cut has not lifted units (they moved {change:+.0f}%) — price changes went along with "
+                "other things that mattered more, such as season or stock")
+    return f"a 10% price cut has lifted units by about {change:.0f}%"
+
+
 def elasticities(sales: pd.DataFrame) -> tuple[dict[str, float], dict[str, float]]:
     """Per-product price elasticity shrunk toward its category median, plus the category medians.
 
@@ -220,8 +229,8 @@ def build_insights(res: ForecastResult, unit_cost: float, recent_daily: float | 
     if profile and not np.isnan(profile.get("elasticity", np.nan)):
         e = profile["elasticity"]
         kind = "highly price sensitive" if e < -1.5 else "moderately price sensitive" if e < -0.8 else "not very price sensitive"
-        out.append(f"**Price elasticity (history):** {e:.2f} — a 10% price cut has historically lifted units by "
-                   f"~{(0.9 ** e - 1) * 100:.0f}%; this product is {kind}.")
+        out.append(f"**Price elasticity (history):** {e:.2f} — historically {elasticity_effect(e)}; this product is "
+                   f"{kind}.")
 
     inv = inventory
     if inv["stockout_date"] is not None:
