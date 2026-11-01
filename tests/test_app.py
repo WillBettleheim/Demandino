@@ -212,3 +212,13 @@ def test_planning_suggests_transfers_between_warehouses():
     at.switch_page("views/planning.py").run()
     assert not at.exception, at.exception
     assert any("avoids about" in s.value for s in at.success)
+
+
+@pytest.mark.parametrize("page", ["views/lifecycle.py", "views/changes.py", "views/lostsales.py", "views/whatif.py",
+                                  "views/targets.py", "views/alerts.py", "views/clearance.py"])
+def test_analysis_pages_offer_a_csv_download(page):
+    at = _new_app()
+    at.run()
+    at.switch_page(page).run()
+    assert not at.exception, at.exception
+    assert any(b.proto.label.startswith("Download") for b in at.get("download_button"))
