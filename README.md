@@ -45,6 +45,15 @@ your own data, choose **Upload my CSV** in the sidebar. You can download a templ
   promotion depth and frequency, the best week to promote, and staying in stock. It ranks the options by profit
   and finds the most profitable tested plan that reaches a sales goal. General good-practice ideas the model
   can't measure (listings, reviews, bundles, channels) are listed separately.
+- **Demand alerts.** A copy of the model trained without the last 4 (or 6, 8) weeks forecasts them, and products
+  whose real weekly sales kept landing outside its range on the same side are flagged as selling faster or slower
+  than expected, with advice and a link to the product. The alerts are also added to the weekly digest.
+- **Clear slow stock.** Finds products with more stock than they'll sell in your chosen number of days and suggests
+  the smallest markdown that clears the excess in time, from each product's price sensitivity, with the cash freed
+  and holding cost avoided.
+- **Your adjustments, scored.** Add reasons and % changes on the Forecast page ("campaign +30%"). Tracked forecasts
+  keep the model's own version too, and the Forecast tracking page shows whether each adjustment made the forecast
+  more or less accurate once real sales arrive.
 - **Explore sales patterns.** Trend, seasonality, weekday × month heatmap, year-over-year, promo lift, price
   elasticity, unusual-day detection and product comparison.
 - **Portfolio overview.** Revenue by category, category growth, ABC × XYZ segmentation and momentum.
