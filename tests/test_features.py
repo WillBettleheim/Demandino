@@ -434,3 +434,32 @@ def test_receiving_a_purchase_order_records_dates():
     db.receive_po(uid, po, 1_000_000.0, 1_000_000.0 + 12 * 86400, "buyer")
     got = db.list_pos(uid)[0]
     assert got["status"] == "Received" and round((got["received_at"] - got["ordered_at"]) / 86400) == 12
+
+
+# -------------------------------------------------------------- transfers
+def test_transfers_move_spare_stock_to_short_warehouses(fc, sales):
+    from demandino.planning import suggest_transfers
+    one = default_stock(sales)
+    one = one[one["product_id"] == "P001"]
+    short = one.assign(warehouse="North", demand_share=50.0, stock=0)
+    full = one.assign(warehouse="South", demand_share=50.0, stock=5000)
+    plan, _ = portfolio_plan(fc, 0.15, pd.concat([short, full], ignore_index=True), 60, 14, 0.95)
+    moves = suggest_transfers(plan, 14)
+    assert len(moves) == 1
+    m = moves.iloc[0]
+    assert m["from_warehouse"] == "South" and m["to_warehouse"] == "North"
+    assert m["units"] == m["order_before"] and m["order_after"] == 0 and m["money_saved"] > 0
+    south = plan[plan["warehouse"] == "South"].iloc[0]
+    keep = south["forecast_daily"] * (south["lead_time"] + 14) + south["safety_stock"]
+    assert m["units"] <= 5000 - keep  # the donor keeps enough for its own cycle
+
+
+def test_no_transfers_with_one_warehouse_or_no_spare(fc, sales):
+    from demandino.planning import suggest_transfers
+    one = default_stock(sales)
+    one = one[one["product_id"] == "P001"]
+    plan, _ = portfolio_plan(fc, 0.15, one.assign(stock=0), 60, 14, 0.95)
+    assert suggest_transfers(plan, 14).empty
+    both_short = pd.concat([one.assign(warehouse=w, demand_share=50.0, stock=0) for w in ("A", "B")], ignore_index=True)
+    plan, _ = portfolio_plan(fc, 0.15, both_short, 60, 14, 0.95)
+    assert suggest_transfers(plan, 14).empty

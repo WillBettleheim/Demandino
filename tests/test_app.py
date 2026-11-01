@@ -196,3 +196,18 @@ def test_orders_page_shows_supplier_delivery_times():
     assert table.loc[0, "supplier"] == "Acme" and table.loc[0, "avg_days"] == 11
     at.switch_page("views/planning.py").run()
     assert not at.exception, at.exception
+
+
+def test_planning_suggests_transfers_between_warehouses():
+    import pandas as pd
+
+    from demandino.planning import default_stock
+    at = _forecast_app()
+    state = at.session_state["_app"]
+    one = default_stock(state.sales)
+    two = pd.concat([one.assign(warehouse="North", demand_share=50.0, stock=0),
+                     one.assign(warehouse="South", demand_share=50.0, stock=one["stock"] * 10)], ignore_index=True)
+    at.session_state[f"pl_stock_{state.data_key}"] = two
+    at.switch_page("views/planning.py").run()
+    assert not at.exception, at.exception
+    assert any("avoids about" in s.value for s in at.success)
