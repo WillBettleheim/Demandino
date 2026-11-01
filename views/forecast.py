@@ -91,14 +91,18 @@ with left:
                                help="Required for profit and pricing advice. The default (55% of price) is a guess.")
         st.caption(f"Margin {(1 - cost / price) * 100:.0f}%" + (
             f" · price {price / default_price - 1:+.0%} vs current" if not new and abs(price / default_price - 1) > 0.005 else ""))
-        horizon = st.select_slider("Horizon (days)", [14, 28, 30, 45, 60, 90, 120, 150, 180], value=90, key="fc_h")
+        horizon = st.select_slider("Horizon (days)", [14, 28, 30, 45, 60, 90, 120, 150, 180], value=90, key="fc_h",
+                                   help="How far ahead to forecast. Shorter horizons are more accurate.")
         start = pd.Timestamp(st.date_input("Start date", A.last_date + pd.Timedelta(days=1),
                                            min_value=A.last_date + pd.Timedelta(days=1),
-                                           max_value=A.last_date + pd.Timedelta(days=60), key="fc_start"))
+                                           max_value=A.last_date + pd.Timedelta(days=60), key="fc_start",
+                                           help="The first day to forecast. Defaults to the day after your latest sales."))
 
     with ui.card("promo"):
         st.markdown("**:material/local_offer: Promotions**")
-        promo_kind = st.selectbox("Promotion plan", PROMO_KINDS, key="fc_promo", label_visibility="collapsed")
+        promo_kind = st.selectbox("Promotion plan", PROMO_KINDS, key="fc_promo", label_visibility="collapsed",
+                                  help="Planning a discount? Pick how often it runs; the forecast adds the extra "
+                                       "sales it usually brings.")
         discount, every, plen, promo_dates = 0.2, 4, 5, None
         if promo_kind != "None":
             discount = st.slider("Discount on promo days", 5, 50, 20, format="%d%%", key="fc_disc") / 100
@@ -110,10 +114,9 @@ with left:
             promo_dates = st.date_input("Promo period", (start + pd.Timedelta(days=14), start + pd.Timedelta(days=20)),
                                         key="fc_pdates")
 
-    with ui.card("events"):
-        st.markdown("**:material/event: Demand events**")
-        st.caption("Known events that change demand: a marketing campaign (+30%), a store closure (−100%), "
-                   "a competitor launch (−15%)…")
+    with ui.card("events"), st.expander("**:material/event: Demand events** · optional"):
+        st.caption("Something coming up that past sales can't show? Add a row: a marketing campaign (+30%), a store "
+                   "closure (−100%), a competitor launch (−15%)…")
         events_df = st.data_editor(
             default_events(), num_rows="dynamic", key="fc_events", width="stretch", hide_index=True,
             column_config={"event": st.column_config.TextColumn("Event", default="Campaign"),
@@ -125,11 +128,15 @@ with left:
     with ui.card("inventory"):
         st.markdown("**:material/warehouse: Inventory**")
         c1, c2 = st.columns(2)
-        stock = c1.number_input("Units in stock", 0, 10_000_000, 500, 10, key="fc_stock")
-        lead = c2.number_input("Lead time (days)", 1, 180, 14, key="fc_lead")
-        review = c1.number_input("Days between orders", 1, 90, 14, key="fc_review")
+        stock = c1.number_input("Units in stock", 0, 10_000_000, 500, 10, key="fc_stock",
+                                help="How many you have on hand today. Used for the reorder advice.")
+        lead = c2.number_input("Lead time (days)", 1, 180, 14, key="fc_lead",
+                               help="Days from placing an order with your supplier until it arrives.")
+        review = c1.number_input("Days between orders", 1, 90, 14, key="fc_review",
+                                 help="How often you usually place orders, e.g. every 14 days.")
         service = c2.number_input("Service level %", 80.0, 99.9, 95.0, 0.5, key="fc_service",
-                                  help="Chance of not running out during a replenishment cycle.") / 100
+                                  help="How hard to try never to run out. 95% = stock lasts through 19 of every "
+                                       "20 order cycles. Higher keeps more spare stock.") / 100
 
     driver_plan = ()
     if A.fc.driver_names:
@@ -139,6 +146,12 @@ with left:
             recent = A.fc.drivers.tail(28).mean()
             driver_plan = tuple((n, float(st.number_input(n.replace("_", " ").capitalize(), value=float(recent[n]),
                                                           key=f"fc_drv_{n}"))) for n in A.fc.driver_names)
+
+    if st.button("Start over", icon=":material/restart_alt:", type="tertiary", key="fc_reset",
+                 help="Reset every input on this page to its default."):
+        for k in [k for k in st.session_state if k.startswith("fc_") or k == "pinned_scenario"]:
+            del st.session_state[k]
+        st.rerun()
 
 inputs = ForecastInputs(
     new=new, pid=pid, name=name, category=category, price=float(price), cost=float(cost), horizon=int(horizon),
