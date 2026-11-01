@@ -139,6 +139,8 @@ div[data-testid="stMetricValue"] {font-family: "Space Grotesk", Inter, sans-seri
   border: none !important; color: #fff !important; box-shadow: 0 10px 30px -14px rgba(249,115,80,.8);
   transition: transform .15s ease, filter .15s ease;}
 [data-testid="stBaseButton-primary"]:hover {transform: translateY(-1px); filter: brightness(1.06);}
+[data-testid="stBaseButton-primary"]:disabled {opacity: .4; filter: grayscale(.5); transform: none; box-shadow: none;
+  cursor: not-allowed;}
 
 /* Sidebar */
 [data-testid="stSidebar"] {border-right: 1px solid var(--edge);}
