@@ -463,3 +463,21 @@ def test_no_transfers_with_one_warehouse_or_no_spare(fc, sales):
     both_short = pd.concat([one.assign(warehouse=w, demand_share=50.0, stock=0) for w in ("A", "B")], ignore_index=True)
     plan, _ = portfolio_plan(fc, 0.15, both_short, 60, 14, 0.95)
     assert suggest_transfers(plan, 14).empty
+
+
+# ------------------------------------------------------------ what changed
+def test_change_parts_add_up_and_follow_last_weeks_sales(sales):
+    from demandino import changes
+    boosted = sales.copy()
+    last_week = (boosted["product_id"] == "P001") & (boosted["date"] > boosted["date"].max() - pd.Timedelta(days=7))
+    boosted.loc[last_week, "units_sold"] *= 3
+    fc = DemandForecaster(boosted, max_iter=60).fit(calibrate=False)
+    e = changes.explain(fc, "P001", 30)
+    assert abs(e["before"] + sum(v for _, v in e["parts"]) - e["now"]) < 1e-6
+    parts = dict(e["parts"])
+    assert parts["Last week's sales"] > 0 and e["change"] > 0  # a strong week raises the forecast
+    assert e["last_week_actual"] > e["last_week_expected"]
+    text = changes.sentence(e)
+    assert text.startswith("Up") and "last week's sales" in text and "more than" in text
+    table = changes.all_products(fc, 14)
+    assert len(table) == fc.sales["product_id"].nunique() and table["why"].str.len().min() > 20
