@@ -1,4 +1,5 @@
 anthropic==2.3.0
+certifi==2026.10.23
 cryptography==50.0.2
 fpdf2==2.8.9
 holidays==0.107
