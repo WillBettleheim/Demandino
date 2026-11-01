@@ -36,7 +36,7 @@ def default_stock(sales: pd.DataFrame, seed: int = 7) -> pd.DataFrame:
         "demand_share": 100.0, "stock": np.round(recent.to_numpy() * days).astype(int), "lead_time": 14,
         "moq": 0, "case_pack": 1, "unit_cost": np.round(price.loc[recent.index].to_numpy() * 0.55, 2),
         "shelf_life": [ILLUSTRATIVE_SHELF_LIFE.get(n, 0) for n in meta.loc[recent.index, "product_name"]],
-        "expires_in": 0,
+        "expires_in": 0, "supplier": "Main supplier",
     })
 
 
@@ -85,7 +85,7 @@ def portfolio_plan(fc: DemandForecaster, level_unc: float, stock: pd.DataFrame, 
     """One row per product × warehouse (forecast, risk, order advice) and the daily forecast (long format)."""
     stock = stock.copy()
     for col, default in (("warehouse", "Main"), ("demand_share", 100.0), ("moq", 0), ("case_pack", 1),
-                         ("unit_cost", 0.0), ("shelf_life", 0), ("expires_in", 0)):
+                         ("unit_cost", 0.0), ("shelf_life", 0), ("expires_in", 0), ("supplier", "Main supplier")):
         if col not in stock:
             stock[col] = default
     stock["demand_share"] = pd.to_numeric(stock["demand_share"], errors="coerce").fillna(100.0).clip(0, 100)
@@ -127,6 +127,7 @@ def portfolio_plan(fc: DemandForecaster, level_unc: float, stock: pd.DataFrame, 
         weekly = pd.Series(res.mean, index=res.dates).resample("W").sum()
         rows.append({
             "status": status, "product_id": r.product_id, "product_name": r.product_name, "category": r.category,
+            "supplier": str(r.supplier or "Main supplier"),
             "warehouse": str(r.warehouse), "recent_daily": float(hist.mean()), "forecast_daily": total / horizon,
             "forecast_units": total, "low": low, "high": high, "revenue": float((res.mean * res.price).sum()),
             "stock": float(r.stock), "days_of_cover": inv["days_of_cover"], "stockout_date": inv["stockout_date"],

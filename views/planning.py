@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from demandino import db, lifecycle, ui
+from demandino import db, lifecycle, suppliers, ui
 from demandino.planning import STATUS_ORDER, cash_flow, default_stock, portfolio_plan
 from demandino.security import safe_csv
 from demandino.state import app
@@ -36,9 +36,9 @@ if stock_key not in st.session_state:
     saved = db.get_setting(uid, f"stock:{A.data_key}") if uid else None
     st.session_state[stock_key] = pd.DataFrame(saved) if saved else default_stock(A.sales)
 base = st.session_state[stock_key].copy()
-for col in ("shelf_life", "expires_in"):  # tables saved before shelf life existed
-    if col not in base:
-        base[col] = 0
+for col, default in (("shelf_life", 0), ("expires_in", 0), ("supplier", suppliers.DEFAULT_SUPPLIER)):
+    if col not in base:  # tables saved before these columns existed
+        base[col] = default
 if st.session_state.get("pl_lead_applied") != default_lead:
     base["lead_time"] = default_lead
     st.session_state[stock_key] = base
@@ -64,6 +64,9 @@ with st.expander("Stock, warehouses & ordering rules — edit to match your busi
                                 "case_pack": st.column_config.NumberColumn("Case pack", min_value=1, step=1, default=1),
                                 "unit_cost": st.column_config.NumberColumn(f"Unit cost ({ui.currency()})",
                                                                            min_value=0.0, format="%.2f"),
+                                "supplier": st.column_config.TextColumn(
+                                    "Supplier", max_chars=60, default=suppliers.DEFAULT_SUPPLIER,
+                                    help="Who you buy it from. Delivery times are learned per supplier."),
                                 "shelf_life": st.column_config.NumberColumn(
                                     "Shelf life (days)", min_value=0, max_value=3650, step=1, default=0,
                                     help="How long a new delivery stays sellable. 0 = doesn't expire."),
@@ -75,7 +78,8 @@ with st.expander("Stock, warehouses & ordering rules — edit to match your busi
     edited["product_name"] = edited["product_id"].map(names["product_name"])
     edited["category"] = edited["product_id"].map(names["category"])
     edited = edited.fillna({"warehouse": "Main", "demand_share": 100, "stock": 0, "lead_time": default_lead, "moq": 0,
-                            "case_pack": 1, "unit_cost": 0.0, "shelf_life": 0, "expires_in": 0})
+                            "case_pack": 1, "unit_cost": 0.0, "shelf_life": 0, "expires_in": 0,
+                            "supplier": suppliers.DEFAULT_SUPPLIER})
     b1, b2 = st.columns(2)
     if b1.button("Reset to illustrative values", icon=":material/restart_alt:"):
         st.session_state[stock_key] = default_stock(A.sales)
@@ -88,6 +92,14 @@ with st.expander("Stock, warehouses & ordering rules — edit to match your busi
 if edited.empty:
     st.info("Add at least one product row to plan.", icon=":material/add:")
     st.stop()
+learned = suppliers.stats(suppliers.deliveries(db.list_pos(uid)), float(service)) if uid else pd.DataFrame()
+if len(learned) and learned["planning_lead"].notna().any():
+    if st.toggle("Use delivery times learned from your received orders", value=True, key="pl_learned",
+                 help="Each supplier's average delivery time plus a margin for how much it varies, instead of the "
+                      "lead time typed in. Record arrivals on the Purchase orders page."):
+        edited, changes = suppliers.apply_learned_lead_times(edited, learned)
+        if changes:
+            st.caption(":material/local_shipping: Lead times from real deliveries: " + "; ".join(changes))
 plan, daily = plan_for(A.data_key, edited, int(horizon), int(review), float(service), float(budget) if budget else None)
 
 counts = plan["status"].value_counts().reindex(STATUS_ORDER, fill_value=0)
@@ -170,8 +182,8 @@ st.dataframe(
 
 to_order = plan[plan["status"].isin(["Order now", "Order this week"])]
 c1, c2, c3 = st.columns(3)
-po = to_order[["product_id", "product_name", "warehouse", "order_qty", "unit_cost", "order_cost", "reorder_date",
-               "stock", "days_of_cover"]].copy()
+po = to_order[["product_id", "product_name", "supplier", "warehouse", "order_qty", "unit_cost", "order_cost",
+               "reorder_date", "lead_time", "stock", "days_of_cover"]].copy()
 c1.download_button(f"Purchase list · {len(po)} lines (CSV)", safe_csv(po), "purchase_list.csv",
                    "text/csv", icon=":material/shopping_cart:", type="primary", width="stretch", disabled=po.empty)
 c2.download_button("Full plan (CSV)", safe_csv(plan.drop(columns=["trend"])), "demand_plan.csv",
