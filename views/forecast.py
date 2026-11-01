@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from demandino import assistant, db, details, ui
+from demandino import assistant, db, details, guide, ui
 from demandino.analysis import DOW_NAMES, product_profile
 from demandino.components import show_patterns
 from demandino.model import RANGE_LABEL
@@ -30,6 +30,7 @@ def run_scenario(data_key: str, inp: ForecastInputs) -> ScenarioResult:
 ui.page_header("Forecast a product",
                "Describe a product and your plans — the model predicts daily demand and explains what drives it. "
                "Results update as you change the inputs.")
+guide.welcome()
 
 if "load_scenario" in st.session_state:
     st.session_state["pinned_scenario"] = st.session_state.pop("load_scenario")
@@ -204,6 +205,7 @@ with right:
         [(f"{r.confidence} confidence", conf_cls), (r.inputs.category, ""), stock_chip]
         + ([(f"{dtype} demand", "warn" if dtype in ("Intermittent", "Lumpy") else "")] if dtype else []) + [track],
         count=(r.total, "fc_total", 0))
+    guide.bottom_line(r, horizon)
 
     days = r.frame().set_index("date")
     weekly = days["forecast"].resample("W").sum()
