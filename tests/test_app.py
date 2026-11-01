@@ -5,7 +5,7 @@ from streamlit.testing.v1 import AppTest
 from demandino.legal import TERMS_VERSION
 
 PAGES = ["views/forecast.py", "views/planning.py", "views/advisor.py", "views/explore.py", "views/overview.py",
-         "views/accuracy.py", "views/terms.py"]
+         "views/accuracy.py", "views/help.py", "views/terms.py"]
 
 
 def _new_app(accept: bool = True) -> AppTest:
@@ -121,3 +121,16 @@ def test_share_link_renders_without_terms():
     at.run()
     assert not at.exception, at.exception
     assert any("Mug forecast" in h.proto.body for h in at.get("html"))
+
+
+def test_welcome_guide_summary_and_start_over():
+    at = _forecast_app()
+    text = _text(at)
+    assert "Three steps to your first forecast" in text
+    assert "In short" in text and "Expect to sell about" in text
+    at.button(key="welcome_ok").click().run()
+    assert "Three steps to your first forecast" not in _text(at)
+    at.select_slider(key="fc_h").set_value(30).run()
+    at.button(key="fc_reset").click().run()
+    assert not at.exception, at.exception
+    assert at.select_slider(key="fc_h").value == 90
