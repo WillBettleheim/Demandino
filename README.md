@@ -54,6 +54,10 @@ your own data, choose **Upload my CSV** in the sidebar. You can download a templ
 - **Your adjustments, scored.** Add reasons and % changes on the Forecast page ("campaign +30%"). Tracked forecasts
   keep the model's own version too, and the Forecast tracking page shows whether each adjustment made the forecast
   more or less accurate once real sales arrive.
+- **One-off bulk orders.** Days far above normal that no promotion explains (usually one large order) are learned
+  as a normal day, and the product's average bulk volume is added back as a steady allowance so totals stay
+  unbiased. On the real data this cut weekly error from 49.7% to 47.3% across five unseen windows. Review the
+  flagged days on the Explore page, untick any that were real demand, or mark others as one-off.
 - **Explore sales patterns.** Trend, seasonality, weekday × month heatmap, year-over-year, promo lift, price
   elasticity, unusual-day detection and product comparison.
 - **Portfolio overview.** Revenue by category, category growth, ABC × XYZ segmentation and momentum.
@@ -114,8 +118,8 @@ is 90 days the model never saw during training or calibration. Days the whole sh
 
 | Data | Unseen test window | Daily misses | Weekly misses | Daily WAPE (simple average) |
 |---|---|---|---|---|
-| Real · UCI | 10 Sep – 9 Dec 2011 | 3.6% | 2.3% | 84% (90%) |
-| Real · UCI | 12 Jun – 10 Sep 2011 | 4.8% | 2.5% | 92% (101%) |
+| Real · UCI | 10 Sep – 9 Dec 2011 | 4.2% | 2.9% | 82% (90%) |
+| Real · UCI | 12 Jun – 10 Sep 2011 | 5.2% | 2.3% | 90% (101%) |
 | Simulated | 30 Jul – 28 Oct 2026 | 3.9% | 1.7% | 36% (46%) |
 | Simulated | 1 May – 30 Jul 2026 | 5.6% | 1.4% | 38% (45%) |
 
