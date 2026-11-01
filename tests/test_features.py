@@ -276,3 +276,26 @@ def test_short_history_trains_and_back_tests(sales):
     assert np.isfinite(fc.forecast_product("P001", 30).mean).all()
     bt = backtest(short, max_iter=40)
     assert 0 <= bt["metrics"]["Daily miss rate"] <= 1
+
+
+# ------------------------------------------------------------ shelf life
+def test_expiry_check_flags_waste_and_caps_orders():
+    from demandino.planning import expiry_check
+    daily = np.full(60, 10.0)
+    assert expiry_check(daily, 500, 0, None, 5, 0)["order_cap"] is None  # doesn't expire
+    out = expiry_check(daily, 500, 21, None, None, 0)
+    assert out["expiring_units"] == 290  # 210 sell in 21 days
+    assert expiry_check(daily, 500, 21, 7, None, 0)["expiring_units"] == 430  # current stock has 7 days left
+    assert expiry_check(daily, 100, 21, None, 20, 0)["order_cap"] == 210
+
+
+def test_plan_reorders_earlier_and_caps_orders_for_perishables(fc, sales):
+    stock = default_stock(sales)
+    stock = stock[stock["product_id"] == "P001"].assign(stock=3000, shelf_life=0, moq=0, case_pack=1)
+    keep, _ = portfolio_plan(fc, 0.15, stock, 60, 14, 0.95)
+    fresh, _ = portfolio_plan(fc, 0.15, stock.assign(shelf_life=14), 60, 14, 0.95)
+    assert keep.loc[0, "expiring_units"] == 0 and fresh.loc[0, "expiring_units"] > 0
+    assert fresh.loc[0, "days_of_cover"] < keep.loc[0, "days_of_cover"]
+    forced, _ = portfolio_plan(fc, 0.15, stock.assign(stock=0, shelf_life=7, moq=5000), 60, 14, 0.95)
+    assert forced.loc[0, "order_waste"] > 0
+    assert any("EXPIRING" in line for line in ig.alert_lines(fresh))
