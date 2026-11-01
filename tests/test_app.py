@@ -176,3 +176,23 @@ def test_tracking_an_adjusted_forecast_keeps_the_model_version():
     assert np.allclose(ratio[3:10], 1.5, atol=0.01) and np.allclose(ratio[:3], 1.0, atol=0.01)
     at.switch_page("views/tracking.py").run()
     assert not at.exception, at.exception
+
+
+def test_orders_page_shows_supplier_delivery_times():
+    import secrets as _s
+
+    from demandino import db
+    uid = db.create_user("s" + _s.token_hex(4), "a very long password")
+    for k, days in enumerate([10, 12, 11]):
+        po = db.create_po(uid, [{"product_id": "P001", "supplier": "Acme", "lead_time": 7, "order_cost": 100.0}])
+        db.decide_po(uid, po, "Ordered", "buyer")
+        db.receive_po(uid, po, 1_700_000_000.0 + k * 3e6, 1_700_000_000.0 + k * 3e6 + days * 86400, "buyer")
+    at = _new_app()
+    at.session_state["user_id"] = uid
+    at.run()
+    at.switch_page("views/orders.py").run()
+    assert not at.exception, at.exception
+    table = at.dataframe[0].value
+    assert table.loc[0, "supplier"] == "Acme" and table.loc[0, "avg_days"] == 11
+    at.switch_page("views/planning.py").run()
+    assert not at.exception, at.exception
