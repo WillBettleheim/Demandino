@@ -6,7 +6,7 @@ import pytest
 from demandino import adjustments, clearance, db, integrations as ig, monitor
 from demandino.analysis import elasticities, promo_spillover
 from demandino.data import generate_sample_data
-from demandino.model import DemandForecaster, demand_class, detect_stockouts, holiday_dates
+from demandino.model import DemandForecaster, demand_class, detect_bulk_orders, detect_stockouts, holiday_dates
 from demandino.pdf_report import scenario_pdf
 from demandino.planning import apply_order_rules, cash_flow, default_stock, portfolio_plan
 from demandino.scenario import ForecastInputs, compute, inputs_from_json, inputs_to_json
@@ -188,3 +188,24 @@ def test_clearance_marks_down_only_overstocked_products(fc, sales):
     assert plan.loc["P001", "cash_freed"] > 0
     assert not plan.drop(index="P001")["slow"].any()
     assert "Mark down" in clearance.advice(plan.loc["P001"])
+
+
+def test_bulk_orders_are_flagged_and_added_back_as_an_allowance(sales):
+    units = np.r_[np.full(60, 10.0), [200.0], np.full(60, 10.0)]
+    flags, normal = detect_bulk_orders(units)
+    assert flags[60] and flags.sum() == 1 and normal[60] < 20
+    promo = np.zeros(len(units), int)
+    promo[60] = 1
+    assert not detect_bulk_orders(units, promo=promo)[0].any()  # a promotion explains the spike
+
+    spiked = sales.copy()
+    day = spiked["date"].max() - pd.Timedelta(days=100)
+    row = (spiked["product_id"] == "P001") & (spiked["date"] == day)
+    spiked.loc[row, ["units_sold", "promo"]] = [5000, 0]
+    fc = DemandForecaster(spiked, max_iter=40).fit(calibrate=False)
+    marked = fc.sales.loc[row].iloc[0]
+    assert marked["bulk"] and marked["demand"] < 200
+    assert 4000 / 365 < fc.context_for("P001").bulk_allowance < 5000 / 365 + 1
+
+    kept = DemandForecaster(spiked, max_iter=40, bulk_keep=frozenset({("P001", day.strftime("%Y-%m-%d"))}))
+    assert not kept.sales.loc[row].iloc[0]["bulk"]

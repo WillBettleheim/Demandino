@@ -140,6 +140,7 @@ def test_alert_opens_product_and_keeps_the_data_source():
     at = _forecast_app()
     at.segmented_control(key="data_source").set_value("Real store").run()
     at.switch_page("views/alerts.py").run()
+    at.segmented_control(key="al_weeks").set_value(8).run()
     assert not at.exception, at.exception
     opens = [b for b in at.button if b.key and b.key.startswith("al_open_")]
     assert opens, "the real store data should have at least one flagged product"
