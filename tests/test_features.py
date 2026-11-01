@@ -524,3 +524,20 @@ def test_store_what_if_adds_up_and_responds_to_price(fc, sales):
                                                         promo_end=start + pd.Timedelta(days=6)), 30)
     assert whatif.totals(sale)["units_change"] > 0  # a sale sells more units
     assert whatif.verdict(whatif.totals(sale), sale, "$")[0].startswith("**Overall:**")
+
+
+# ----------------------------------------------------------- buying budget
+def test_buying_budget_uses_stock_first(fc, sales):
+    from demandino import budget
+    stock = default_stock(sales)
+    empty = budget.needs(fc, stock.assign(stock=0), 3)
+    full = budget.needs(fc, stock.assign(stock=10 ** 7), 3)
+    assert empty["buy"].sum() > 0 and np.isclose(empty["buy"].sum(), empty["cogs"].sum())
+    assert full["buy"].sum() == 0  # plenty of stock: nothing to buy
+    m = budget.against_budget(empty, empty.groupby("month")["buy"].sum().max() / 2)
+    assert (m["status"] == "Over budget").any() and "Over budget" in budget.summary(m, "$")[1]
+
+
+def test_forecasts_beyond_180_days_work(fc):
+    res = fc.forecast_product("P001", 240)
+    assert len(res.mean) == 240 and np.isfinite(res.mean).all()
