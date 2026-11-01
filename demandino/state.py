@@ -17,7 +17,7 @@ import pandas as pd
 import streamlit as st
 
 from .analysis import elasticities
-from . import account, db
+from . import account, db, monitor
 from .data import generate_sample_data, prepare_sales, template_csv
 from .model import LEVEL_WINDOW, DemandForecaster, backtest
 from .security import UploadError, check_sales_limits, clean_text, dump_signed, load_signed, read_csv_upload
@@ -85,6 +85,12 @@ def _backtest(data_key: str, _sales: pd.DataFrame, _country: str | None, _driver
                         lambda: backtest(_sales, holdout_days=90, country=_country, drivers=_drivers))
 
 
+@st.cache_data(show_spinner="Checking recent sales against the forecast…", max_entries=12, ttl=6 * 3600)
+def _drift(data_key: str, weeks: int, _fc: DemandForecaster) -> tuple[pd.DataFrame, pd.Timestamp]:
+    old, cutoff = monitor.holdout_model(_fc, weeks)
+    return monitor.drift_report(old, cutoff, weeks), cutoff
+
+
 @st.cache_data(show_spinner=False, max_entries=6, ttl=6 * 3600)
 def _elasticities(data_key: str, _sales: pd.DataFrame) -> tuple[dict[str, float], dict[str, float]]:
     return elasticities(_sales)
@@ -109,6 +115,10 @@ class AppState:
     @property
     def user_id(self) -> int | None:
         return account.current_user()
+
+    def drift(self, weeks: int = monitor.DRIFT_WEEKS) -> tuple[pd.DataFrame, pd.Timestamp]:
+        """Recent weeks' sales vs a model that never saw them (see monitor.py)."""
+        return _drift(self.data_key, weeks, self.fc)
 
     @property
     def elasticities(self) -> tuple[dict[str, float], dict[str, float]]:

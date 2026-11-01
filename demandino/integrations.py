@@ -222,8 +222,9 @@ def alert_lines(plan: pd.DataFrame, stockout_days: int = 14, change_pct: float =
     return out
 
 
-def digest_text(plan: pd.DataFrame, horizon: int, currency: str = "$") -> str:
-    lines = alert_lines(plan)
+def digest_text(plan: pd.DataFrame, horizon: int, currency: str = "$", lines: list[str] | None = None) -> str:
+    """The weekly digest. `lines` are the alerts to list (default: stock and demand alerts from the plan)."""
+    lines = alert_lines(plan) if lines is None else lines
     total = plan["forecast_units"].sum()
     rev = plan["revenue"].sum()
     spend = plan.loc[plan["status"].astype(str).isin(["Order now", "Order this week"]), "order_cost"].sum()

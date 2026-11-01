@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pandas as pd  # noqa: E402
 
-from demandino import db, integrations as ig  # noqa: E402
+from demandino import db, integrations as ig, monitor  # noqa: E402
 from demandino.data import generate_sample_data, prepare_sales  # noqa: E402
 from demandino.model import DemandForecaster  # noqa: E402
 from demandino.planning import default_stock, portfolio_plan  # noqa: E402
@@ -48,7 +48,10 @@ def main() -> None:
         stock = db.get_setting(u["id"], f"stock:{cfg['dataset_key']}")
         stock = pd.DataFrame(stock) if stock else default_stock(sales)
         plan, _ = portfolio_plan(fc, fc.level_uncertainty, stock, int(cfg.get("horizon", 30)), 14, 0.95)
-        text = ig.digest_text(plan, int(cfg.get("horizon", 30)), db.get_setting(u["id"], "currency", "$"))
+        old, cutoff = monitor.holdout_model(fc)
+        lines = (ig.alert_lines(plan, int(cfg.get("stockout_days", 14)), float(cfg.get("change_pct", 30)))
+                 + monitor.drift_lines(monitor.drift_report(old, cutoff)))
+        text = ig.digest_text(plan, int(cfg.get("horizon", 30)), db.get_setting(u["id"], "currency", "$"), lines)
         sent = []
         hook = db.get_secret(u["id"], "slack_webhook")
         if hook:

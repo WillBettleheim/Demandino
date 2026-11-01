@@ -1,7 +1,7 @@
 import pandas as pd
 import streamlit as st
 
-from demandino import account, db, integrations as ig, ui
+from demandino import account, db, integrations as ig, monitor, ui
 from demandino.planning import default_stock, portfolio_plan
 from demandino.security import clean_text
 from demandino.state import app
@@ -136,8 +136,8 @@ with t5:
     stock = db.get_setting(uid, f"stock:{A.data_key}")
     stock = pd.DataFrame(stock) if stock else default_stock(A.sales)
     plan, _ = portfolio_plan(A.fc, A.level_uncertainty, stock, int(horizon), 14, 0.95)
-    lines = ig.alert_lines(plan, int(so_days), float(change))
-    digest = ig.digest_text(plan, int(horizon), ui.currency())
+    lines = ig.alert_lines(plan, int(so_days), float(change)) + monitor.drift_lines(A.drift()[0])
+    digest = ig.digest_text(plan, int(horizon), ui.currency(), lines)
     st.markdown(f"##### Preview · {len(lines)} alerts for the current data")
     st.code(digest, language=None)
     if not db.get_setting(uid, f"stock:{A.data_key}"):

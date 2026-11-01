@@ -33,6 +33,10 @@ ui.page_header("Forecast a product",
                "Results update as you change the inputs.")
 guide.welcome()
 
+if "open_product" in st.session_state:  # sent from another page (e.g. Demand alerts)
+    st.session_state["fc_mode"] = "Existing"
+    st.session_state["fc_pid"] = st.session_state.pop("open_product")
+    st.session_state.pop("pinned_scenario", None)
 if "load_scenario" in st.session_state:
     st.session_state["pinned_scenario"] = st.session_state.pop("load_scenario")
 pinned: ForecastInputs | None = st.session_state.get("pinned_scenario")
