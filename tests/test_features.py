@@ -481,3 +481,27 @@ def test_change_parts_add_up_and_follow_last_weeks_sales(sales):
     assert text.startswith("Up") and "last week's sales" in text and "more than" in text
     table = changes.all_products(fc, 14)
     assert len(table) == fc.sales["product_id"].nunique() and table["why"].str.len().min() > 20
+
+
+# --------------------------------------------------------------- lost sales
+def test_lost_sales_value_stockout_days():
+    from demandino import lostsales
+    days = pd.date_range("2026-01-01", periods=10)
+    sales = pd.DataFrame({"date": days, "product_id": "A", "product_name": "Mug", "category": "Home", "price": 10.0,
+                          "units_sold": [5, 5, 0, 0, 0, 5, 5, 0, 0, 5], "demand": [5, 5, 5, 5, 5, 5, 5, 4, 4, 5],
+                          "stockout": [0, 0, 1, 1, 1, 0, 0, 1, 1, 0]})
+    rows = lostsales.daily(sales, {"A": 6.0})
+    assert rows["lost_units"].sum() == 23 and rows["lost_sales"].sum() == 230 and rows["lost_profit"].sum() == 92
+    ep = lostsales.episodes(rows)
+    assert len(ep) == 2 and ep.iloc[0]["days"] == 3 and ep.iloc[0]["lost_sales"] == 150
+    prod = lostsales.by_product(rows)
+    assert prod.loc[0, "episodes"] == 2 and prod.loc[0, "days"] == 5
+    text = lostsales.ideas(prod, 300.0, "$")
+    assert "Mug" in text[0] and "$230" in text[0] and "43.4%" in text[1]
+
+
+def test_lost_sales_found_in_the_sample_shop(sales):
+    from demandino import lostsales
+    fc = DemandForecaster(sales)
+    rows = lostsales.daily(fc.sales)
+    assert len(rows) > 0 and (rows["lost_units"] > 0).all() and rows["lost_sales"].sum() > 0
