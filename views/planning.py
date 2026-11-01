@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from demandino import db, ui
+from demandino import db, lifecycle, ui
 from demandino.planning import STATUS_ORDER, cash_flow, default_stock, portfolio_plan
 from demandino.security import safe_csv
 from demandino.state import app
@@ -106,6 +106,14 @@ with st.container(horizontal=True):
               delta=f"{int(counts['Deferred (budget)'])} deferred" if counts["Deferred (budget)"] else None,
               delta_color="off", delta_arrow="off")
 
+life = lifecycle.stages(A.sales).set_index("product_id")["stage"].astype(str)
+plan["life_stage"] = plan["product_id"].map(life)
+fading = plan[(plan["life_stage"] == "End of life") & (plan["order_qty"] > 0)]
+if len(fading):
+    st.warning(f"{len(fading)} product{'s are' if len(fading) > 1 else ' is'} at the end of life but still on the order "
+               "list: " + ", ".join(fading["product_name"].unique()[:4]) + ". Consider not reordering — see "
+               "**Product life stages**.", icon=":material/block:")
+
 perishable = plan[plan["shelf_life"] > 0]
 if not perishable.empty:
     waste = perishable[perishable["expiring_units"] > 0.5].sort_values("expiring_value", ascending=False)
@@ -135,12 +143,12 @@ icons = {"Order now": "🔴 Order now", "Order this week": "🟠 Order this week
          "Healthy": "🟢 Healthy", "Deferred (budget)": "⚪ Deferred (budget)"}
 view["status"] = view["status"].astype(str).map(icons)
 st.dataframe(
-    view[["status", "product_name", "warehouse", "trend", "recent_daily", "forecast_daily", "forecast_units", "stock",
+    view[["status", "product_name", "life_stage", "warehouse", "trend", "recent_daily", "forecast_daily", "forecast_units", "stock",
           "days_of_cover", "stockout_date", "reorder_date", "suggested_qty", "order_qty", "order_cost", "revenue"]
          + (["expiring_units"] if (plan["shelf_life"] > 0).any() else [])],
     hide_index=True, width="stretch", height=min(42 + 35 * len(view), 640),
     column_config={
-        "status": "Status", "product_name": "Product", "warehouse": "Warehouse",
+        "status": "Status", "product_name": "Product", "warehouse": "Warehouse", "life_stage": "Life stage",
         "suggested_qty": st.column_config.NumberColumn("Needed", format="%,.0f",
                                                        help="Units needed before MOQ and case-pack rounding."),
         "order_cost": st.column_config.NumberColumn(f"Cost ({ui.currency()})", format="%,.0f"),
