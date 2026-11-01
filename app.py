@@ -45,7 +45,8 @@ pages = {
     ],
     "Model": [st.Page("views/accuracy.py", title="Model accuracy", icon=":material/fact_check:"),
               st.Page("views/tracking.py", title="Forecast tracking", icon=":material/track_changes:")],
-    "About": [st.Page("views/terms.py", title="Terms & conditions", icon=":material/gavel:")],
+    "About": [st.Page("views/help.py", title="Help & glossary", icon=":material/menu_book:"),
+              st.Page("views/terms.py", title="Terms & conditions", icon=":material/gavel:")],
 }
 nav = st.navigation(pages)
 
