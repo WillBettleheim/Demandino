@@ -21,6 +21,8 @@ PAGES = [
      "Concrete ideas to sell more: price, promotions, timing and stock."),
     ("views/targets.py", "Sales targets", ":material/flag:",
      "Will you hit this month's or quarter's target, how likely, and what would close the gap."),
+    ("views/whatif.py", "Store what-if", ":material/science:",
+     "Try one price change or sale across many products and see the effect on the whole shop's profit."),
     ("views/alerts.py", "Demand alerts", ":material/notifications_active:",
      "Which products are suddenly selling faster or slower than the forecast said."),
     ("views/changes.py", "What changed", ":material/difference:",
