@@ -17,9 +17,9 @@ import pandas as pd
 import streamlit as st
 
 from .analysis import elasticities
-from . import account, db, monitor
+from . import account, db, monitor, quality
 from .data import generate_sample_data, prepare_sales, template_csv
-from .model import LEVEL_WINDOW, DemandForecaster, backtest
+from .model import MIN_CHECK_DAYS, MIN_TRAIN_DAYS, DemandForecaster, backtest
 from .security import UploadError, check_sales_limits, clean_text, dump_signed, load_signed, read_csv_upload
 
 MODEL_VERSION = 9
@@ -64,10 +64,13 @@ def _load_real(mtime: float) -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False, max_entries=4, ttl=3600)
-def _load_upload(content: bytes) -> pd.DataFrame:
-    sales = prepare_sales(read_csv_upload(content))
+def _load_upload(content: bytes, choices: tuple = ()) -> tuple[pd.DataFrame, list]:
+    """Read an upload, check it for problems, and apply the chosen fixes (see quality.py)."""
+    raw = read_csv_upload(content)
+    issues = quality.check(raw)
+    sales = quality.apply_fixes(raw, dict(choices))
     check_sales_limits(sales)
-    return sales
+    return sales, issues
 
 
 @st.cache_resource(show_spinner="Training the forecasting model on all products (first run only)…", max_entries=6,
@@ -197,11 +200,26 @@ def sidebar_data_source() -> AppState | None:
                                icon=":material/download:", width="stretch")
             st.caption("Required: `date, product_id, units_sold, price`. Optional: `product_name, category, "
                        "regular_price, promo, on_hand` (stock on hand helps spot stock-outs).")
+            st.download_button("Try a messy example file", quality.messy_example(), "messy_sales_example.csv",
+                               "text/csv", icon=":material/bug_report:", width="stretch",
+                               help="A small file with one of every common data problem, to see the data check.")
+            st.session_state.pop("_dq", None)
             if up is not None:
                 content = up.getvalue()
+                choices = tuple(sorted(st.session_state.get("dq_choices", {}).items()))
                 try:
-                    sales = _load_upload(content)
-                    key = "upload-" + hashlib.md5(content).hexdigest()[:16]
+                    sales, issues = _load_upload(content, choices)
+                    key = "upload-" + hashlib.md5(content + repr(choices).encode()).hexdigest()[:16]
+                    st.session_state["_dq"] = {"name": up.name, "issues": issues, "products": sales["product_id"].nunique(),
+                                               "days": len(sales), "start": sales["date"].min(),
+                                               "end": sales["date"].max()}
+                    todo = [i for i in issues if i.severity == "warn"]
+                    if todo:
+                        st.warning(f"Data check: {len(todo)} thing{'s' * (len(todo) > 1)} to review.",
+                                   icon=":material/fact_check:")
+                        st.page_link("views/datacheck.py", label="Review the data check", icon=":material/arrow_forward:")
+                    else:
+                        st.caption(":material/check_circle: Data check passed.")
                 except (UploadError, ValueError) as exc:
                     st.error(str(exc)[:300])
                 except Exception:  # noqa: BLE001 - never show internals for a bad file
@@ -269,8 +287,9 @@ def sidebar_data_source() -> AppState | None:
     if sales is None:
         st.info("Choose or upload sales data in the sidebar.", icon=":material/upload:")
         return None
-    if sales.groupby("product_id")["date"].count().max() < LEVEL_WINDOW + 30:
-        st.error(f"Need at least {LEVEL_WINDOW + 30} days of history for at least one product to train the model.")
+    if sales.groupby("product_id")["date"].count().max() < MIN_TRAIN_DAYS + MIN_CHECK_DAYS:
+        st.error(f"Need at least {MIN_TRAIN_DAYS + MIN_CHECK_DAYS} days of history for at least one product: "
+                 f"{MIN_TRAIN_DAYS} to learn from and {MIN_CHECK_DAYS} to test the forecast on.")
         return None
     country = None if country == "None" else country
     full_key = f"{key}-{country or 'none'}"
