@@ -35,6 +35,8 @@ PAGES = [
      "Forecasts added up for each category and the whole shop."),
     ("views/assistant.py", "Ask Demandino", ":material/auto_awesome:",
      "Ask questions about a forecast in plain language."),
+    ("views/datacheck.py", "Data check", ":material/rule:",
+     "Problems found in your uploaded file — duplicates, returns, gaps, odd prices — and how to fix them."),
     ("views/accuracy.py", "Model accuracy", ":material/fact_check:",
      "How reliable the forecasts were when tested on sales the model hadn't seen."),
 ]
@@ -50,7 +52,9 @@ st.markdown(
     "2. It needs at least `date`, `product_id` and `units_sold`. Price, category and promotion columns make the "
     "forecast smarter. Download the template there to see the format.\n"
     "3. Two years of history is ideal; a few months works, but seasonal patterns need at least one full year.\n"
-    "4. Sign in to keep your data, scenarios and settings in your private workspace.")
+    "4. The **Data check** page lists any problems in the file (duplicates, returns, gaps, odd prices) and lets "
+    "you choose how to fix each one.\n"
+    "5. Sign in to keep your data, scenarios and settings in your private workspace.")
 
 st.subheader("Words you'll see")
 guide.glossary_cards()

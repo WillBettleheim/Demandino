@@ -3,10 +3,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from demandino import adjustments, clearance, db, integrations as ig, monitor, targets
+from demandino import adjustments, clearance, db, integrations as ig, monitor, quality, targets
 from demandino.analysis import elasticities, elasticity_effect, promo_spillover
-from demandino.data import generate_sample_data
-from demandino.model import DemandForecaster, demand_class, detect_bulk_orders, detect_stockouts, holiday_dates
+from demandino.data import generate_sample_data, template_csv
+from demandino.model import (DemandForecaster, backtest, demand_class, detect_bulk_orders, detect_stockouts,
+                             holiday_dates)
 from demandino.pdf_report import scenario_pdf
 from demandino.planning import apply_order_rules, cash_flow, default_stock, portfolio_plan
 from demandino.scenario import ForecastInputs, compute, inputs_from_json, inputs_to_json
@@ -236,3 +237,42 @@ def test_default_period_is_the_month_or_quarter_ahead():
                                                                          pd.Timestamp("2026-11-30"))
     assert targets.default_period(pd.Timestamp("2026-11-10"), "Quarter") == (pd.Timestamp("2026-10-01"),
                                                                            pd.Timestamp("2026-12-31"))
+
+
+# ------------------------------------------------------------------- data check
+def test_data_check_finds_each_problem_in_the_messy_example():
+    import io
+    raw = pd.read_csv(io.StringIO(quality.messy_example()))
+    found = {i.code: i for i in quality.check(raw, today=pd.Timestamp("2026-07-01"))}
+    assert {"unreadable", "future", "duplicates", "negative", "prices", "gaps", "short"} <= set(found)
+    assert found["gaps"].count == 20 and found["short"].severity == "info"
+
+
+def test_data_check_fixes_change_the_data_as_chosen():
+    import io
+    raw = pd.read_csv(io.StringIO(quality.messy_example()))
+    today = pd.Timestamp("2026-07-01")
+    default = quality.apply_fixes(raw, today=today)
+    assert default["date"].max() <= today and default["units_sold"].min() >= 0
+    assert "stockout" not in default
+    assert default["price"].max() < 1000  # the ×100 price was replaced by the usual price
+    chosen = quality.apply_fixes(raw, {"gaps": "stockout", "prices": "keep"}, today=today)
+    assert chosen["stockout"].sum() == 20 and chosen["price"].max() > 1000
+    assert quality.apply_fixes(raw, {"future": "keep"}, today=today)["date"].max().year == 2062
+    summed = default.set_index(["product_id", "date"])["units_sold"]
+    last = quality.apply_fixes(raw, {"duplicates": "last"}, today=today).set_index(["product_id", "date"])["units_sold"]
+    assert summed.sum() > last.sum()  # adding up duplicated rows counts more than keeping one
+
+
+def test_clean_file_has_no_issues():
+    import io
+    raw = pd.read_csv(io.StringIO(template_csv()))
+    assert [i.code for i in quality.check(raw, today=pd.Timestamp("2026-07-01")) if i.severity == "warn"] == []
+
+
+def test_short_history_trains_and_back_tests(sales):
+    short = sales[sales["date"] > sales["date"].max() - pd.Timedelta(days=170)]
+    fc = DemandForecaster(short, max_iter=40).fit()
+    assert np.isfinite(fc.forecast_product("P001", 30).mean).all()
+    bt = backtest(short, max_iter=40)
+    assert 0 <= bt["metrics"]["Daily miss rate"] <= 1

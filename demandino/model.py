@@ -26,6 +26,8 @@ from .data import black_friday
 
 LEVEL_WINDOW = 56
 MAX_GAP = 180
+MIN_TRAIN_DAYS = LEVEL_WINDOW + 30  # history the model needs before it can learn anything
+MIN_CHECK_DAYS = 28                 # shortest held-out period worth calibrating or testing on
 QUANTILES = (0.05, 0.95)
 # Prediction ranges are conformally calibrated on held-out sales to contain 95% of real outcomes, which keeps
 # out-of-sample misses under ~7% even when the season or trend shifts between calibration and use.
@@ -546,11 +548,13 @@ class DemandForecaster:
         the prediction ranges (split-conformal calibration). Then the model is retrained.
         """
         end = self.sales["date"].max() if cutoff is None else pd.Timestamp(cutoff)
-        if calibrate:
-            cal_start = end - pd.Timedelta(days=CALIBRATION_DAYS)
+        # Short histories get a shorter calibration period; with too little history the ranges stay uncalibrated.
+        cal_days = min(CALIBRATION_DAYS, (end - self.sales["date"].min()).days + 1 - MIN_TRAIN_DAYS)
+        if calibrate and cal_days >= MIN_CHECK_DAYS:
+            cal_start = end - pd.Timedelta(days=cal_days)
             self._fit_at(cal_start)
             self.conformal_q, self.level_uncertainty, self.bias_factor = 0.0, 0.0, 1.0
-            origins = [cal_start + pd.Timedelta(days=d) for d in range(0, CALIBRATION_DAYS - 13, 30)]
+            origins = [cal_start + pd.Timedelta(days=d) for d in range(0, cal_days - 13, 30)]
             raw = holdout_forecasts(self, origins, end)
             self.calibration = calibrate_ranges(raw, self.closed_dates)
             self.conformal_q = self.calibration["conformal_q"]
@@ -819,6 +823,8 @@ def backtest(sales: pd.DataFrame, holdout_days: int = 90, **kwargs) -> dict:
     The test window is never seen during training or calibration.
     """
     last = sales["date"].max()
+    # Short histories are tested on a shorter final period, leaving enough to train on.
+    holdout_days = max(MIN_CHECK_DAYS, min(holdout_days, (last - sales["date"].min()).days + 1 - MIN_TRAIN_DAYS))
     cutoff = last - pd.Timedelta(days=holdout_days)
     fc = DemandForecaster(sales, **kwargs).fit(cutoff=cutoff)
     raw = holdout_forecasts(fc, [cutoff], last, horizon=holdout_days)
