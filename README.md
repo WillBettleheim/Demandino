@@ -61,6 +61,9 @@ your own data, choose **Upload my CSV** in the sidebar. You can download a templ
   as a normal day, and the product's average bulk volume is added back as a steady allowance so totals stay
   unbiased. On the real data this cut weekly error from 49.7% to 47.3% across five unseen windows. Review the
   flagged days on the Explore page, untick any that were real demand, or mark others as one-off.
+- **Data check.** Uploaded files are checked before training for unreadable rows, future dates, duplicate rows,
+  returns, odd prices, long gaps and products with little history. Each problem is explained with examples and a
+  choice of fix; nothing is changed silently. A deliberately messy example file is included to try it.
 - **Explore sales patterns.** Trend, seasonality, weekday × month heatmap, year-over-year, promo lift, price
   elasticity, unusual-day detection and product comparison.
 - **Portfolio overview.** Revenue by category, category growth, ABC × XYZ segmentation and momentum.
