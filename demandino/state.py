@@ -153,9 +153,21 @@ def _read_drivers(content: bytes) -> pd.DataFrame:
     return d
 
 
+_KEPT = "_sidebar_kept"
+
+
+def _kept_key(k: str) -> bool:
+    return k in ("data_source", "currency") or k.startswith(("country_", "fx_"))
+
+
 def sidebar_data_source() -> AppState | None:
     """Render the data-source controls in the sidebar and return the active dataset."""
     uid = account.current_user()
+    # A page switch made from code (st.switch_page) drops sidebar widget values; put the last choices back.
+    kept = st.session_state.setdefault(_KEPT, {})
+    for k, v in kept.items():
+        if k not in st.session_state:
+            st.session_state[k] = v
     with st.sidebar:
         st.markdown("**Data**")
         options = ["Sample", "Real store", "My CSV"] if REAL_DATA.exists() else ["Sample", "My CSV"]
@@ -237,6 +249,7 @@ def sidebar_data_source() -> AppState | None:
                                                      "Leave at 1 if your data is already in this currency.")
         if uid is not None:
             db.set_setting(uid, "currency", cur)
+    kept.update({k: v for k, v in st.session_state.items() if isinstance(k, str) and _kept_key(k)})
 
     if sales is None:
         st.info("Choose or upload sales data in the sidebar.", icon=":material/upload:")
