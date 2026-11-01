@@ -7,6 +7,7 @@ import streamlit as st
 
 from demandino import clearance, db, ui
 from demandino.planning import default_stock
+from demandino.security import safe_csv
 from demandino.state import app
 
 A = app()
@@ -93,3 +94,5 @@ with st.expander(f"All products ({len(plan)})", icon=":material/table_rows:"):
                                                                  help="−2 means a 10% cut sells ~20% more.")})
 st.caption("Markdown effects are estimated from each product's past price changes. Test a markdown on the "
            "**Forecast a product** page (set the price) before committing to it.")
+st.download_button("Download clearance plan (CSV)", safe_csv(plan), "clearance_plan.csv", "text/csv", icon=":material/download:",
+                   key="dl_clearance_plan")

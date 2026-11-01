@@ -7,6 +7,7 @@ import streamlit as st
 
 from demandino import baskets, lifecycle, ui
 from demandino.security import UploadError
+from demandino.security import safe_csv
 from demandino.state import app
 
 A = app()
@@ -95,3 +96,5 @@ with st.expander(f"All pairs ({len(pt)})", icon=":material/table_rows:"):
         "lift": st.column_config.NumberColumn("× chance", format="%.1f")})
 st.caption("“× chance” compares with customers picking products independently. Orders are counted among "
            "those containing at least one of these products.")
+st.download_button("Download product pairs (CSV)", safe_csv(pt), "bought_together.csv", "text/csv", icon=":material/download:",
+                   key="dl_bought_together")

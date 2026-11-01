@@ -2,6 +2,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from demandino import monitor, ui
+from demandino.security import safe_csv
 from demandino.state import app
 
 A = app()
@@ -58,3 +59,5 @@ with st.expander(f"All products ({len(rep)})", icon=":material/table_rows:", exp
                      "change": st.column_config.NumberColumn("Vs expected", format="percent"),
                      "weeks_outside": st.column_config.NumberColumn("Weeks outside range", format="%d")})
 st.caption("These alerts are also added to the weekly digest on **Connections & alerts**.")
+st.download_button("Download demand alerts (CSV)", safe_csv(rep.drop(columns=['weekly_change'])), "demand_alerts.csv", "text/csv", icon=":material/download:",
+                   key="dl_demand_alerts")

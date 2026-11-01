@@ -2,6 +2,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from demandino import lifecycle, ui
+from demandino.security import safe_csv
 from demandino.state import app
 
 A = app()
@@ -74,3 +75,5 @@ for stage in lifecycle.STAGES:
                                                                     min_value=0, max_value=1)})
 if len(ending):
     st.page_link("views/clearance.py", label="Clear the stock of declining products", icon=":material/sell:")
+st.download_button("Download life stages (CSV)", safe_csv(st_df), "life_stages.csv", "text/csv", icon=":material/download:",
+                   key="dl_life_stages")

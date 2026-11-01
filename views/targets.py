@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from demandino import db, targets, ui
+from demandino.security import safe_csv
 from demandino.state import app
 
 A = app()
@@ -121,3 +122,5 @@ if A.user_id is not None:
             st.rerun()
 else:
     st.caption("Sign in to save targets and follow them over time.")
+st.download_button("Download target progress by product (CSV)", safe_csv(p["products"]), "target_progress.csv", "text/csv", icon=":material/download:",
+                   key="dl_target_progress")
