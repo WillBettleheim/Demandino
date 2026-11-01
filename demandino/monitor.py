@@ -20,9 +20,10 @@ MIN_WEEKS = 2
 def holdout_model(fc: DemandForecaster, weeks: int = DRIFT_WEEKS) -> tuple[DemandForecaster, pd.Timestamp]:
     """The main model's setup, retrained without the last `weeks` weeks (ranges copied from the main model)."""
     cutoff = fc.sales["date"].max() - pd.Timedelta(days=7 * weeks)
-    sales = fc.sales.drop(columns=["stockout", "demand"], errors="ignore")
+    sales = fc.sales.drop(columns=["stockout", "bulk", "demand"], errors="ignore")
     old = DemandForecaster(sales, country=fc.country, drivers=fc.drivers, max_iter=fc.max_iter,
-                           stockout_correction=fc.stockout_correction).fit(cutoff=cutoff, calibrate=False)
+                           stockout_correction=fc.stockout_correction, bulk_correction=fc.bulk_correction,
+                           bulk_keep=fc.bulk_keep, bulk_add=fc.bulk_add).fit(cutoff=cutoff, calibrate=False)
     old.conformal_q, old.level_uncertainty = fc.conformal_q, fc.level_uncertainty
     return old, cutoff
 
