@@ -10,6 +10,7 @@ from demandino.model import (DemandForecaster, backtest, demand_class, detect_bu
                              holiday_dates)
 from demandino.pdf_report import scenario_pdf
 from demandino.planning import apply_order_rules, cash_flow, default_stock, portfolio_plan
+from demandino.security import UploadError
 from demandino.scenario import ForecastInputs, compute, inputs_from_json, inputs_to_json
 
 
@@ -357,3 +358,44 @@ def test_weather_only_talks_to_open_meteo():
         ig._check_url("https://evil.example/v1/archive", hosts=weather.HOSTS)
     with pytest.raises(ig.ConnectorError):
         weather.find_place(" ")
+
+
+# ---------------------------------------------------------- bought together
+def _orders() -> pd.DataFrame:
+    """300 orders: B is almost always bought with A (A also sells alone); C turns up now and then."""
+    rows = []
+    for k in range(300):
+        rows.append((k, "A"))
+        if k % 3:
+            rows.append((k, "B"))
+        if k % 5 == 0:
+            rows.append((k, "C"))
+    return pd.DataFrame(rows, columns=["order_id", "product_id"]).astype(str)
+
+
+def test_pairs_find_products_bought_together():
+    from demandino import baskets
+    pt = baskets.pairs(_orders(), {"A": "Mug", "B": "Coaster"}, min_together=10)
+    ab = pt[(pt["a"] == "A") & (pt["b"] == "B")].iloc[0]
+    assert ab["a_name"] == "Mug" and ab["together"] > 100 and ab["b_to_a"] == 1.0
+    partners = baskets.partners(pt, "B")
+    assert partners.iloc[0]["other"] == "A"
+    assert baskets.ideas(baskets.pairs(_orders(), min_together=10)) != []
+
+
+def test_drop_risk_warns_about_declining_products_in_shared_orders():
+    from demandino import baskets
+    pt = pd.DataFrame({"a": ["A"], "a_name": ["Mug"], "b": ["B"], "b_name": ["Coaster"], "together": [100],
+                       "share_of_orders": [0.3], "a_to_b": [0.5], "b_to_a": [0.9], "lift": [3.0]})
+    warn = baskets.drop_risks(pt, {"A": "Declining", "B": "Mature"})
+    assert len(warn) == 1 and "Careful before dropping:** Mug" in warn[0] and "90% of Coaster orders" in warn[0]
+    assert baskets.drop_risks(pt, {"A": "Mature", "B": "Mature"}) == []
+
+
+def test_order_lines_upload_accepts_common_column_names():
+    from demandino import baskets
+    csv = "Invoice,StockCode,Qty\n" + "".join(f"{k},{p},1\n" for k in range(60) for p in ("X1", "Y2"))
+    lines = baskets.read_order_lines(csv.encode())
+    assert set(lines.columns) == {"order_id", "product_id"} and lines["order_id"].nunique() == 60
+    with pytest.raises(UploadError):
+        baskets.read_order_lines(b"date,units\n2026-01-01,3\n")
