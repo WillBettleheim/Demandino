@@ -216,8 +216,10 @@ def featurise(ctx: SeriesContext, t_idx: np.ndarray, o_idx: np.ndarray, cat_code
               ) -> pd.DataFrame:
     """Build feature rows for targets t_idx forecast from origins o_idx (indices into the series)."""
     t_idx = np.asarray(t_idx)
-    o_idx = np.asarray(o_idx)
     units = ctx.units.astype(float)
+    gap = (t_idx - np.asarray(o_idx)).astype(float)
+    # Horizons beyond MAX_GAP put the origin past the history; history features then use its last day.
+    o_idx = np.minimum(np.asarray(o_idx), len(units) - 1)
     csum = np.concatenate([[0.0], np.cumsum(units)])
     csq = np.concatenate([[0.0], np.cumsum(units ** 2)])
     pcsum = np.concatenate([[0.0], np.cumsum(ctx.price[: len(units)])])
@@ -267,7 +269,7 @@ def featurise(ctx: SeriesContext, t_idx: np.ndarray, o_idx: np.ndarray, cat_code
     price_t = ctx.price[t_idx]
     feats = pd.DataFrame({
         "category": float(cat_codes[ctx.category]) if ctx.category in cat_codes else np.nan,
-        "gap": (t_idx - o_idx).astype(float),
+        "gap": gap,
         "log_level": np.log1p(level),
         "trend_ratio": trend,
         "level_cv": std / (level + 0.5),
