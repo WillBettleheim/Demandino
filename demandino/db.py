@@ -61,9 +61,11 @@ CREATE TABLE IF NOT EXISTS shares (
   title TEXT NOT NULL, payload TEXT NOT NULL, FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE);
 CREATE TABLE IF NOT EXISTS purchase_orders (
   id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, created REAL NOT NULL, status TEXT NOT NULL, note TEXT NOT NULL,
-  lines TEXT NOT NULL, decided_at REAL, decided_by TEXT,
+  lines TEXT NOT NULL, decided_at REAL, decided_by TEXT, ordered_at REAL, received_at REAL,
   FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE);
 """
+# Columns added after the first release, for databases created before them.
+MIGRATIONS = [("purchase_orders", "ordered_at", "REAL"), ("purchase_orders", "received_at", "REAL")]
 
 
 class AuthError(ValueError):
@@ -89,6 +91,9 @@ def connect():
         _owner_only(DB_PATH)
     try:
         con.executescript(SCHEMA)
+        for table, column, kind in MIGRATIONS:
+            if column not in {r["name"] for r in con.execute(f"PRAGMA table_info({table})")}:
+                con.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
         yield con
         con.commit()
     finally:
@@ -369,3 +374,16 @@ def decide_po(user_id: int, po_id: int, status: str, by: str) -> None:
     with connect() as con:
         con.execute("UPDATE purchase_orders SET status = ?, decided_at = ?, decided_by = ? WHERE id = ? AND user_id = ?",
                     (status, time.time(), by[:40], po_id, user_id))
+        if status == "Ordered":
+            con.execute("UPDATE purchase_orders SET ordered_at = COALESCE(ordered_at, ?) WHERE id = ? AND user_id = ?",
+                        (time.time(), po_id, user_id))
+
+
+def receive_po(user_id: int, po_id: int, ordered_at: float, received_at: float, by: str) -> None:
+    """Record when an order was placed and when it actually arrived (this is what delivery times are learned from)."""
+    if received_at < ordered_at:
+        raise ValueError("An order can't arrive before it was placed.")
+    with connect() as con:
+        con.execute("UPDATE purchase_orders SET status = 'Received', ordered_at = ?, received_at = ?, decided_by = ? "
+                    "WHERE id = ? AND user_id = ? AND status IN ('Approved', 'Ordered', 'Received')",
+                    (ordered_at, received_at, by[:40], po_id, user_id))
