@@ -541,3 +541,20 @@ def test_buying_budget_uses_stock_first(fc, sales):
 def test_forecasts_beyond_180_days_work(fc):
     res = fc.forecast_product("P001", 240)
     assert len(res.mean) == 240 and np.isfinite(res.mean).all()
+
+
+# ------------------------------------------------------------------ inbox
+def test_inbox_orders_items_by_urgency():
+    from demandino import inbox
+    plan = pd.DataFrame({"product_id": ["A", "B", "C"], "product_name": ["Mug", "Pan", "Hat"],
+                         "status": ["Order now", "Order this week", "Healthy"], "order_qty": [10, 5, 3],
+                         "expiring_units": [0, 40, 0]})
+    drift = pd.DataFrame({"product_name": ["Pan"], "flagged": [True], "direction": ["Below"]})
+    lost = pd.DataFrame({"product_id": ["A"], "lost_sales": [120.0]})
+    items = inbox.collect(plan, drift, {"C": "End of life"}, lost,
+                          [{"label": "Shop", "start": "2026-11-01", "end": "2026-11-30", "chance": 0.2}], "$")
+    titles = [i["title"] for i in items]
+    assert titles[0] == "Order now" and "Selling slower than forecast" in titles
+    assert "End-of-life products on order" in titles and "Stock about to expire" in titles
+    assert titles[-1] in ("Recent stock-outs", "Target at risk") and "$120" in " ".join(i["text"] for i in items)
+    assert inbox.collect(plan.assign(status="Healthy", expiring_units=0), drift.iloc[:0], {}, lost.iloc[:0], []) == []
