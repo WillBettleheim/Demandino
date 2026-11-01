@@ -399,3 +399,38 @@ def test_order_lines_upload_accepts_common_column_names():
     assert set(lines.columns) == {"order_id", "product_id"} and lines["order_id"].nunique() == 60
     with pytest.raises(UploadError):
         baskets.read_order_lines(b"date,units\n2026-01-01,3\n")
+
+
+# ------------------------------------------------------- supplier lead times
+def _po(pid, supplier, ordered, days, planned=14):
+    day = 86400.0
+    return {"id": pid, "status": "Received", "ordered_at": ordered * day, "received_at": (ordered + days) * day,
+            "lines": [{"product_id": "P001", "supplier": supplier, "lead_time": planned}]}
+
+
+def test_supplier_stats_learn_delivery_times_and_trends():
+    from demandino import suppliers
+    pos = [_po(k, "Steady Co", 20000 + 30 * k, 10) for k in range(6)]
+    pos += [_po(100 + k, "Slow Ltd", 20000 + 30 * k, d) for k, d in enumerate([9, 10, 9, 18, 20, 22])]
+    pos.append({"id": 999, "status": "Ordered", "ordered_at": 1.0, "received_at": None, "lines": []})
+    st_ = suppliers.stats(suppliers.deliveries(pos)).set_index("supplier")
+    assert st_.loc["Steady Co", "avg_days"] == 10 and st_.loc["Steady Co", "planning_lead"] == 10
+    assert st_.loc["Steady Co", "trend"] == "Steady" and st_.loc["Steady Co", "late_share"] == 0
+    assert st_.loc["Slow Ltd", "trend"] == "Getting slower"
+    assert st_.loc["Slow Ltd", "planning_lead"] > st_.loc["Slow Ltd", "avg_days"]  # margin for variation
+    stock = pd.DataFrame({"product_id": ["P001", "P002"], "supplier": ["Slow Ltd", "Unknown"], "lead_time": [14, 7]})
+    adjusted, notes = suppliers.apply_learned_lead_times(stock, st_.reset_index())
+    assert adjusted.loc[0, "lead_time"] == st_.loc["Slow Ltd", "planning_lead"] and adjusted.loc[1, "lead_time"] == 7
+    assert notes and "Slow Ltd" in notes[0]
+
+
+def test_receiving_a_purchase_order_records_dates():
+    uid = db.create_user("buyer_test", "a very long password")
+    po = db.create_po(uid, [{"product_id": "P001", "supplier": "Acme", "lead_time": 14}])
+    db.decide_po(uid, po, "Ordered", "buyer")
+    assert db.list_pos(uid)[0]["ordered_at"] is not None
+    with pytest.raises(ValueError):
+        db.receive_po(uid, po, 2_000_000.0, 1_000_000.0, "buyer")
+    db.receive_po(uid, po, 1_000_000.0, 1_000_000.0 + 12 * 86400, "buyer")
+    got = db.list_pos(uid)[0]
+    assert got["status"] == "Received" and round((got["received_at"] - got["ordered_at"]) / 86400) == 12
