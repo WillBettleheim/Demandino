@@ -155,8 +155,43 @@ def portfolio_plan(fc: DemandForecaster, level_unc: float, stock: pd.DataFrame, 
             else:
                 plan.loc[i, "status"] = "Deferred (budget)"
         plan = plan.sort_values(["status", "days_of_cover"]).reset_index(drop=True)
-    plan.attrs["today"] = today
+    plan.attrs["today"] = f"{today:%Y-%m-%d}"  # text, so tables carrying it can still be displayed
     return plan, pd.concat(daily, ignore_index=True)
+
+
+def suggest_transfers(plan: pd.DataFrame, review: int, min_units: float = 1.0) -> pd.DataFrame:
+    """Move stock from warehouses with more than they need to ones about to run short, before buying more.
+
+    A warehouse can give what it holds beyond its own next cycle: forecast sales until its next delivery
+    could arrive (lead time + days between orders) plus its safety stock. A warehouse takes up to what it
+    would otherwise order now or this week. Largest moves first; each unit is only promised once.
+    """
+    cols = ["product_id", "product_name", "from_warehouse", "to_warehouse", "units", "order_before", "order_after",
+            "money_saved"]
+    if plan.empty or plan["warehouse"].nunique() < 2:
+        return pd.DataFrame(columns=cols)
+    rows = []
+    for pid, g in plan.groupby("product_id"):
+        if len(g) < 2:
+            continue
+        spare = {r.warehouse: max(0.0, r.stock - r.forecast_daily * (r.lead_time + review) - r.safety_stock)
+                 for r in g.itertuples()}
+        needy = g[g["status"].astype(str).isin(["Order now", "Order this week"]) & (g["order_qty"] > 0)]
+        for r in needy.sort_values("days_of_cover").itertuples():
+            want = float(r.order_qty)
+            for donor in sorted((w for w in spare if w != r.warehouse), key=lambda w: -spare[w]):
+                units = float(np.floor(min(want, spare[donor])))
+                if units < min_units:
+                    continue
+                spare[donor] -= units
+                rows.append({"product_id": pid, "product_name": r.product_name, "from_warehouse": donor,
+                             "to_warehouse": r.warehouse, "units": units, "order_before": float(r.order_qty),
+                             "order_after": max(0.0, want - units), "money_saved": units * float(r.unit_cost)})
+                want -= units
+                if want < min_units:
+                    break
+    out = pd.DataFrame(rows, columns=cols)
+    return out.sort_values("money_saved", ascending=False).reset_index(drop=True)
 
 
 def cash_flow(plan: pd.DataFrame, daily: pd.DataFrame, cost_ratio: pd.Series | None = None) -> pd.DataFrame:
