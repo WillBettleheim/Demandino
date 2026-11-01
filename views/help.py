@@ -23,6 +23,8 @@ PAGES = [
      "Will you hit this month's or quarter's target, how likely, and what would close the gap."),
     ("views/alerts.py", "Demand alerts", ":material/notifications_active:",
      "Which products are suddenly selling faster or slower than the forecast said."),
+    ("views/changes.py", "What changed", ":material/difference:",
+     "How each product's forecast moved since last week, and why, in plain words."),
     ("views/clearance.py", "Clear slow stock", ":material/sell:",
      "Products with too much stock, and the markdown that clears it."),
     ("views/orders.py", "Purchase orders", ":material/receipt_long:",
