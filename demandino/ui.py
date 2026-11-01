@@ -25,8 +25,8 @@ PALETTE = ["#14B8A6", "#F97350", "#3B82F6", "#F59E0B", "#EC4899", "#8B5CF6", "#2
 SEQ = [[0, "rgba(20,184,166,0.06)"], [0.5, "#14B8A6"], [1, "#F97350"]]  # heatmaps
 
 PAGE_PATHS = ["/", "/planning", "/advisor", "/targets", "/alerts", "/clearance", "/explore", "/overview",
-              "/hierarchy", "/assistant", "/workspace", "/datacheck", "/connections", "/orders", "/accuracy",
-              "/tracking", "/help", "/terms"]
+              "/hierarchy", "/lifecycle", "/assistant", "/workspace", "/datacheck", "/connections", "/orders",
+              "/accuracy", "/tracking", "/help", "/terms"]
 
 CSS = """
 <style>
