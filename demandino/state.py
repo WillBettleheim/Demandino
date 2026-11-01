@@ -17,7 +17,8 @@ import pandas as pd
 import streamlit as st
 
 from .analysis import elasticities
-from . import account, db, monitor, quality
+from . import account, db, monitor, quality, weather
+from .integrations import ConnectorError
 from .data import generate_sample_data, prepare_sales, template_csv
 from .model import MIN_CHECK_DAYS, MIN_TRAIN_DAYS, DemandForecaster, backtest
 from .security import UploadError, check_sales_limits, clean_text, dump_signed, load_signed, read_csv_upload
@@ -275,6 +276,10 @@ def sidebar_data_source() -> AppState | None:
                     st.caption(f"Using {', '.join(drivers.columns)} ({len(drivers)} days).")
                 except (UploadError, ValueError) as exc:
                     st.error(str(exc)[:300])
+            if sales is not None:
+                wx = _weather_controls(key, sales, uid)
+                if wx is not None:
+                    drivers = wx if drivers is None else drivers.join(wx, how="outer")
         c1, c2 = st.columns(2)
         cur = c1.selectbox("Show money in", ["$", "€", "£", "₹", "¥", "₦", "R", "A$"], key="currency")
         rate = c2.number_input("Exchange rate", min_value=0.0001, max_value=100000.0, value=1.0, format="%.4f",
@@ -304,6 +309,47 @@ def sidebar_data_source() -> AppState | None:
         full_key += "-blk" + hashlib.md5(repr((sorted(keep), sorted(add))).encode()).hexdigest()[:10]
     return AppState(sales=sales, data_key=full_key, source=source, country=country, drivers=drivers,
                     bulk=(keep, add), base_key=base_key)
+
+
+@st.cache_data(show_spinner="Fetching weather…", max_entries=8, ttl=6 * 3600)
+def _weather(lat: float, lon: float, start: pd.Timestamp, end: pd.Timestamp) -> pd.DataFrame:
+    return weather.daily_weather(lat, lon, start, end)
+
+
+def _weather_controls(key: str, sales: pd.DataFrame, uid: int | None) -> pd.DataFrame | None:
+    """Optional daily temperature and rain for a chosen place, as outside factors (sends only the place's
+    coordinates and dates to Open-Meteo)."""
+    setting = f"weather:{key}"
+    place = st.session_state.get(setting)
+    if place is None and uid is not None:
+        place = db.get_setting(uid, setting)
+    st.markdown("**Weather** · helps drinks, clothing, garden and other weather-sensitive products")
+    if place is None:
+        city = st.text_input("Town or city", key=f"wx_city_{key}", max_chars=80, placeholder="e.g. London")
+        if st.button("Add weather", icon=":material/partly_cloudy_day:", disabled=not city, key=f"wx_add_{key}"):
+            try:
+                place = weather.find_place(city)
+                st.session_state[setting] = place
+                if uid is not None:
+                    db.set_setting(uid, setting, place)
+                st.rerun()
+            except ConnectorError as exc:
+                st.error(str(exc))
+        st.caption("Only the place's location and dates are sent to Open-Meteo — never your sales.")
+        return None
+    try:
+        wx = _weather(place["latitude"], place["longitude"], sales["date"].min(), sales["date"].max())
+    except ConnectorError as exc:
+        st.error(f"Weather unavailable: {exc}")
+        return None
+    st.caption(f":material/partly_cloudy_day: {place['name']}, {place['country']}: {weather.describe(wx)}")
+    if st.button("Remove weather", icon=":material/close:", key=f"wx_remove_{key}"):
+        st.session_state[setting] = None
+        st.session_state.pop(setting)
+        if uid is not None:
+            db.set_setting(uid, setting, None)
+        st.rerun()
+    return wx
 
 
 def _bulk_setting(base_key: str) -> str:
