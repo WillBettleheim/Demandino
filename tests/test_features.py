@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from demandino import adjustments, clearance, db, integrations as ig, monitor
+from demandino import adjustments, clearance, db, integrations as ig, monitor, targets
 from demandino.analysis import elasticities, elasticity_effect, promo_spillover
 from demandino.data import generate_sample_data
 from demandino.model import DemandForecaster, demand_class, detect_bulk_orders, detect_stockouts, holiday_dates
@@ -214,3 +214,25 @@ def test_bulk_orders_are_flagged_and_added_back_as_an_allowance(sales):
 def test_elasticity_wording_stays_true_for_positive_values():
     assert "lifted units by about 23%" in elasticity_effect(-2.0)
     assert "has not lifted units" in elasticity_effect(0.36)
+
+
+def test_target_progress_adds_actuals_and_forecast(fc):
+    last = fc.sales["date"].max()
+    start, end = last - pd.Timedelta(days=9), last + pd.Timedelta(days=20)
+    p = targets.progress(fc, ["P001", "P002"], start, end, "units")
+    sold = fc.sales[fc.sales["product_id"].isin(["P001", "P002"]) & (fc.sales["date"] >= start)]["units_sold"].sum()
+    assert p["days_done"] == 10 and p["days_left"] == 20
+    assert np.isclose(p["actual"], sold) and p["forecast_rest"] > 0
+    assert np.isclose(p["projected"], p["actual"] + p["forecast_rest"])
+    assert targets.chance(p, p["projected"] * 0.5) > 0.9 > 0.1 > targets.chance(p, p["projected"] * 2)
+    covered = targets.levers(p, p["projected"] * 0.9, {}, 0.3)
+    assert len(covered) == 1 and "to spare" in covered[0]
+    gap = targets.levers(p, p["projected"] * 1.1, {"P001": -2.0, "P002": -2.0}, 0.5)
+    assert any(line.startswith("**Price:**") for line in gap) and any("Promotions" in line for line in gap)
+
+
+def test_default_period_is_the_month_or_quarter_ahead():
+    assert targets.default_period(pd.Timestamp("2026-10-31"), "Month") == (pd.Timestamp("2026-11-01"),
+                                                                         pd.Timestamp("2026-11-30"))
+    assert targets.default_period(pd.Timestamp("2026-11-10"), "Quarter") == (pd.Timestamp("2026-10-01"),
+                                                                           pd.Timestamp("2026-12-31"))

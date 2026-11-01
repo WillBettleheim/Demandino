@@ -19,6 +19,8 @@ PAGES = [
      "Order quantities for every product at once, within a budget."),
     ("views/advisor.py", "Grow demand", ":material/rocket_launch:",
      "Concrete ideas to sell more: price, promotions, timing and stock."),
+    ("views/targets.py", "Sales targets", ":material/flag:",
+     "Will you hit this month's or quarter's target, how likely, and what would close the gap."),
     ("views/alerts.py", "Demand alerts", ":material/notifications_active:",
      "Which products are suddenly selling faster or slower than the forecast said."),
     ("views/clearance.py", "Clear slow stock", ":material/sell:",

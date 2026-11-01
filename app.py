@@ -31,6 +31,7 @@ pages = {
         st.Page("views/forecast.py", title="Forecast a product", icon=":material/online_prediction:", default=True),
         st.Page("views/planning.py", title="Demand planning", icon=":material/inventory:"),
         st.Page("views/advisor.py", title="Grow demand", icon=":material/rocket_launch:"),
+        st.Page("views/targets.py", title="Sales targets", icon=":material/flag:"),
         st.Page("views/alerts.py", title="Demand alerts", icon=":material/notifications_active:"),
         st.Page("views/clearance.py", title="Clear slow stock", icon=":material/sell:"),
     ],

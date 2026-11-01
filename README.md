@@ -45,6 +45,9 @@ your own data, choose **Upload my CSV** in the sidebar. You can download a templ
   promotion depth and frequency, the best week to promote, and staying in stock. It ranks the options by profit
   and finds the most profitable tested plan that reaches a sales goal. General good-practice ideas the model
   can't measure (listings, reviews, bundles, channels) are listed separately.
+- **Sales targets.** Set a target for a month, a quarter or custom dates, in units or revenue, for the whole shop,
+  a category or a product. It adds the forecast for the days left to what's been sold, gives the chance of making
+  it, and says what would close a gap (price, promotions, which products to push). Signed-in users can save targets.
 - **Demand alerts.** A copy of the model trained without the last 4 (or 6, 8) weeks forecasts them, and products
   whose real weekly sales kept landing outside its range on the same side are flagged as selling faster or slower
   than expected, with advice and a link to the product. The alerts are also added to the weekly digest.
