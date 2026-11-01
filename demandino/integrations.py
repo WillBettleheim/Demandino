@@ -212,6 +212,10 @@ def alert_lines(plan: pd.DataFrame, stockout_days: int = 14, change_pct: float =
         days = (pd.Timestamp(r.stockout_date) - plan.attrs.get("today", pd.Timestamp(r.stockout_date))).days
         if 0 <= days <= stockout_days and str(r.status) != "Order now":
             out.append(f"STOCK-OUT SOON · {r.product_name}: runs out around {pd.Timestamp(r.stockout_date):%d %b}.")
+    if "expiring_units" in plan:
+        for r in plan[plan["expiring_units"] > 0.5].itertuples():
+            out.append(f"EXPIRING · {r.product_name}: about {r.expiring_units:,.0f} units likely to expire before "
+                       "they sell.")
     for r in plan.itertuples():
         if r.recent_daily > 0:
             ch = (r.forecast_daily / r.recent_daily - 1) * 100
