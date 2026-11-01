@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from demandino import db, lifecycle, suppliers, ui
-from demandino.planning import STATUS_ORDER, cash_flow, default_stock, portfolio_plan
+from demandino.planning import STATUS_ORDER, cash_flow, default_stock, portfolio_plan, suggest_transfers
 from demandino.security import safe_csv
 from demandino.state import app
 
@@ -179,6 +179,29 @@ st.dataframe(
         "expiring_units": st.column_config.NumberColumn("Will expire", format="%,.0f",
                                                         help="Units of current stock likely to expire before they sell."),
     })
+
+st.markdown("#### Move stock between warehouses")
+if plan["warehouse"].nunique() < 2:
+    st.caption("With more than one warehouse (add a row per warehouse in the stock table above), Demandino suggests "
+               "moving spare stock to where it's about to run out before buying more.")
+else:
+    moves = suggest_transfers(plan, int(review))
+    if moves.empty:
+        st.caption(":material/check_circle: No useful moves: no warehouse is short while another has spare stock.")
+    else:
+        st.success(f"Moving **{ui.num(moves['units'].sum())} units** across {len(moves)} transfers avoids about "
+                   f"**{ui.money(moves['money_saved'].sum())}** of new orders.".replace("$", "\\$"),
+                   icon=":material/swap_horiz:")
+        st.dataframe(moves.drop(columns=["product_id"]), hide_index=True, width="stretch", column_config={
+            "product_name": "Product", "from_warehouse": "From", "to_warehouse": "To",
+            "units": st.column_config.NumberColumn("Move", format="%,.0f"),
+            "order_before": st.column_config.NumberColumn("Order without moving", format="%,.0f"),
+            "order_after": st.column_config.NumberColumn("Order after moving", format="%,.0f"),
+            "money_saved": st.column_config.NumberColumn(f"Saved ({ui.currency()})", format="%,.0f")})
+        st.download_button(f"Transfer list · {len(moves)} moves (CSV)", safe_csv(moves), "stock_transfers.csv",
+                           "text/csv", icon=":material/swap_horiz:")
+        st.caption("Donors keep enough for their own next delivery cycle plus safety stock. After moving stock, "
+                   "update the stock table so the purchase list shrinks to match.")
 
 to_order = plan[plan["status"].isin(["Order now", "Order this week"])]
 c1, c2, c3 = st.columns(3)
