@@ -25,6 +25,8 @@ PAGES = [
      "Which products are suddenly selling faster or slower than the forecast said."),
     ("views/clearance.py", "Clear slow stock", ":material/sell:",
      "Products with too much stock, and the markdown that clears it."),
+    ("views/orders.py", "Purchase orders", ":material/receipt_long:",
+     "Approve orders, record when they arrive, and see each supplier's real delivery times."),
     ("views/tracking.py", "Forecast tracking", ":material/track_changes:",
      "Compare past forecasts with what sold — and whether your adjustments helped."),
     ("views/explore.py", "Explore sales patterns", ":material/query_stats:",

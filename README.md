@@ -78,6 +78,10 @@ your own data, choose **Upload my CSV** in the sidebar. You can download a templ
   than chance, suggests bundles and "goes well with" pairings, and warns before dropping a declining product
   that customers often buy with a steady seller. The real UCI orders are included
   (`data/uci_online_retail_baskets.csv`, made by `scripts/prepare_uci.py`); upload your own on the page.
+- **Supplier delivery times.** Mark purchase orders as received with the dates they were placed and arrived, and
+  Demandino learns each supplier's real delivery time, how much it varies, how often it's late and whether it's
+  getting slower. Demand planning can plan with "average + a margin for the variation" instead of a fixed lead time,
+  so unreliable suppliers get more safety stock. Add a supplier per product in the stock table.
 - **Explore sales patterns.** Trend, seasonality, weekday × month heatmap, year-over-year, promo lift, price
   elasticity, unusual-day detection and product comparison.
 - **Portfolio overview.** Revenue by category, category growth, ABC × XYZ segmentation and momentum.
