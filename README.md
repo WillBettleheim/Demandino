@@ -70,6 +70,10 @@ your own data, choose **Upload my CSV** in the sidebar. You can download a templ
 - **Product life stages.** Each product is labelled launching, growing, mature, declining or end of life from its
   age, growth against the same months last year and distance from its best 90 days, with stock advice for each
   stage. Demand planning shows the stage and warns when end-of-life products are still on the order list.
+- **Weather (optional).** Under Outside factors, type a town or city and Demandino adds daily temperature and rain
+  from Open-Meteo (free, no key): past weather, the 16-day forecast, then the local climate normal. Only the
+  place's location and dates are sent. On the real UCI gift shop it made no measurable difference (weekly error
+  47.3% either way), so it's off by default and meant for weather-sensitive products.
 - **Explore sales patterns.** Trend, seasonality, weekday × month heatmap, year-over-year, promo lift, price
   elasticity, unusual-day detection and product comparison.
 - **Portfolio overview.** Revenue by category, category growth, ABC × XYZ segmentation and momentum.

@@ -322,3 +322,38 @@ def test_life_stages_for_every_product(sales):
     assert len(st_df) == sales["product_id"].nunique()
     assert set(st_df["stage"].astype(str)) <= set(lifecycle.STAGES)
     assert st_df["advice"].str.len().min() > 20
+
+
+# ----------------------------------------------------------------- weather
+def test_weather_combines_archive_forecast_and_climate_normal(monkeypatch):
+    from demandino import weather
+
+    def fake(url, params):
+        if url == weather.GEOCODE:
+            return {"results": [{"name": "London", "country": "United Kingdom", "latitude": 51.5, "longitude": -0.1}]}
+        if url == weather.ARCHIVE:
+            days = pd.date_range(params["start_date"], params["end_date"])
+        else:
+            days = pd.date_range("2026-10-25", periods=23)
+        temp = 10 + 8 * np.sin(2 * np.pi * (days.day_of_year - 110) / 365.25)
+        return {"daily": {"time": days.strftime("%Y-%m-%d").tolist(), "temperature_2m_mean": temp.tolist(),
+                          "precipitation_sum": [1.0] * len(days)}}
+
+    monkeypatch.setattr(weather, "_json", fake)
+    assert weather.find_place("London")["country"] == "United Kingdom"
+    w = weather.daily_weather(51.5, -0.1, pd.Timestamp("2024-01-01"), pd.Timestamp("2026-10-31"),
+                              today=pd.Timestamp("2026-11-01"))
+    assert w.index.min() == pd.Timestamp("2024-01-01")
+    assert w.index.max() == pd.Timestamp("2026-10-31") + pd.Timedelta(days=weather.FUTURE_DAYS)
+    assert not w.isna().any().any()
+    spring = w.loc["2027-04-01":"2027-05-01", "temperature"].mean()
+    winter = w.loc["2027-01-01":"2027-01-31", "temperature"].mean()
+    assert spring > winter  # beyond the forecast, the climate normal keeps the seasons
+
+
+def test_weather_only_talks_to_open_meteo():
+    from demandino import weather
+    with pytest.raises(ig.ConnectorError):
+        ig._check_url("https://evil.example/v1/archive", hosts=weather.HOSTS)
+    with pytest.raises(ig.ConnectorError):
+        weather.find_place(" ")

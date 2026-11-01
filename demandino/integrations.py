@@ -39,7 +39,17 @@ class _SameHostRedirect(urllib.request.HTTPRedirectHandler):
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
-_opener = urllib.request.build_opener(_SameHostRedirect)
+def _tls_context() -> ssl.SSLContext:
+    """Certificate checking always on; uses certifi's trusted roots when the system ones aren't available
+    (python.org builds on macOS ship without them)."""
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return ssl.create_default_context()
+
+
+_opener = urllib.request.build_opener(_SameHostRedirect, urllib.request.HTTPSHandler(context=_tls_context()))
 
 
 def _check_url(url: str, hosts: tuple[str, ...] | None = None, pattern: re.Pattern | None = None) -> str:
@@ -255,7 +265,7 @@ def send_email(host: str, port: int, user: str, password: str, sender: str, to: 
     msg = EmailMessage()
     msg["From"], msg["To"], msg["Subject"] = sender, to, subject[:200]
     msg.set_content(body[:100_000])
-    ctx = ssl.create_default_context()
+    ctx = _tls_context()
     try:
         if int(port) == 465:
             with smtplib.SMTP_SSL(host, int(port), context=ctx, timeout=TIMEOUT) as s:
