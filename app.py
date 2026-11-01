@@ -48,6 +48,7 @@ pages = {
         st.Page("views/assistant.py", title="Ask Demandino", icon=":material/auto_awesome:"),
     ],
     "Workspace": [
+        st.Page("views/inbox.py", title="Inbox", icon=":material/inbox:"),
         st.Page("views/workspace.py", title="Workspace", icon=":material/folder_shared:"),
         st.Page("views/datacheck.py", title="Data check", icon=":material/rule:"),
         st.Page("views/connections.py", title="Connections & alerts", icon=":material/hub:"),
