@@ -88,6 +88,9 @@ your own data, choose **Upload my CSV** in the sidebar. You can download a templ
   Demandino learns each supplier's real delivery time, how much it varies, how often it's late and whether it's
   getting slower. Demand planning can plan with "average + a margin for the variation" instead of a fixed lead time,
   so unreliable suppliers get more safety stock. Add a supplier per product in the stock table.
+- **Lost sales.** Puts a money figure on stock-outs: demand on days a product had run out (estimated from the days
+  around them) minus what sold, valued at the price, with lost profit from your unit costs. By product, by month
+  and by stock-out episode, with the products that keep running out called out.
 - **Explore sales patterns.** Trend, seasonality, weekday × month heatmap, year-over-year, promo lift, price
   elasticity, unusual-day detection and product comparison.
 - **Portfolio overview.** Revenue by category, category growth, ABC × XYZ segmentation and momentum.
