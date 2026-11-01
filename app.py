@@ -43,6 +43,7 @@ pages = {
     ],
     "Workspace": [
         st.Page("views/workspace.py", title="Workspace", icon=":material/folder_shared:"),
+        st.Page("views/datacheck.py", title="Data check", icon=":material/rule:"),
         st.Page("views/connections.py", title="Connections & alerts", icon=":material/hub:"),
         st.Page("views/orders.py", title="Purchase orders", icon=":material/receipt_long:"),
     ],
