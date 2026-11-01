@@ -6,7 +6,8 @@ import streamlit as st
 from demandino import ui
 from demandino.analysis import product_profile
 from demandino.components import findings, show_patterns
-from demandino.state import app
+from demandino.model import detect_bulk_orders
+from demandino.state import app, set_bulk_choices
 
 A = app()
 
@@ -43,6 +44,52 @@ if not np.isnan(prof["cv"]):
 findings(lines, f"What the history says about {name}")
 
 show_patterns(g, prof, name)
+
+st.divider()
+st.markdown("#### One-off bulk orders")
+st.caption("Days far above normal that no promotion explains — usually a single large order. The model learns from "
+           "a normal day instead, and adds this product's average bulk volume back as a steady allowance, so "
+           "totals stay right while everyday forecasts get steadier. Untick a day if it was real, repeatable demand.")
+keep, add = A.bulk
+closed = full["date"].isin(A.fc.closed_dates).to_numpy()
+auto, normal = detect_bulk_orders(full["units_sold"].to_numpy(), closed, full["promo"].to_numpy())
+day_str = full["date"].dt.strftime("%Y-%m-%d").to_numpy()
+cand = auto | np.isin(day_str, [d for p_, d in add if p_ == pid])
+table = pd.DataFrame({"date": full["date"].to_numpy()[cand], "units_sold": full["units_sold"].to_numpy()[cand],
+                      "normal": normal[cand].round(1)})
+table["one_off"] = [((pid, d) not in keep) for d in day_str[cand]]
+if table.empty:
+    st.success(f"No one-off bulk orders found for {name}.", icon=":material/check_circle:")
+edited = st.data_editor(table, key=f"bulk_{A.base_key}_{pid}", hide_index=True, width="stretch",
+                        disabled=["date", "units_sold", "normal"], column_config={
+                            "date": st.column_config.DateColumn("Day", format="D MMM YYYY"),
+                            "units_sold": st.column_config.NumberColumn("Sold", format="%,.0f"),
+                            "normal": st.column_config.NumberColumn("A normal day", format="%,.1f"),
+                            "one_off": st.column_config.CheckboxColumn("One-off?", help="Untick if this was real, "
+                                                                       "repeatable demand the model should learn.")}
+                        ) if not table.empty else table
+c1, c2, c3 = st.columns([1.2, 1, 1], vertical_alignment="bottom")
+extra = c1.date_input("Mark another day as one-off", value=None, min_value=full["date"].min(),
+                      max_value=full["date"].max(), key=f"bulk_extra_{pid}")
+new_keep = {k for k in keep if k[0] != pid} | {(pid, d.strftime("%Y-%m-%d")) for d, on in
+                                               zip(edited["date"], edited["one_off"]) if not on}
+new_add = {a for a in add if a[0] != pid} | {(pid, d) for d in day_str[cand] if (pid, d) in add}
+if extra is not None:
+    new_add.add((pid, pd.Timestamp(extra).strftime("%Y-%m-%d")))
+    new_keep.discard((pid, pd.Timestamp(extra).strftime("%Y-%m-%d")))
+changed = (frozenset(new_keep), frozenset(new_add)) != (keep, add)
+if c2.button("Update the model", type="primary", icon=":material/model_training:", disabled=not changed,
+             width="stretch", help="Retrains the forecasting model with your choices (about 20 seconds)."):
+    set_bulk_choices(A.base_key, new_keep, new_add)
+    st.session_state.pop(f"bulk_extra_{pid}", None)
+    st.rerun()
+if (keep or add) and c3.button("Reset to automatic", icon=":material/restart_alt:", width="stretch"):
+    set_bulk_choices(A.base_key, set(), set())
+    st.rerun()
+allowance = A.fc.context_for(pid).bulk_allowance
+if allowance > 0:
+    st.caption(f"Bulk orders add about **{allowance:,.2f} units a day** back to {name}'s forecasts (their average "
+               "over the last year).")
 
 st.divider()
 st.markdown("#### Compare products")
