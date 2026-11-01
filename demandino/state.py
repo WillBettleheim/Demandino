@@ -22,7 +22,7 @@ from .data import generate_sample_data, prepare_sales, template_csv
 from .model import LEVEL_WINDOW, DemandForecaster, backtest
 from .security import UploadError, check_sales_limits, clean_text, dump_signed, load_signed, read_csv_upload
 
-MODEL_VERSION = 8
+MODEL_VERSION = 9
 COUNTRIES = {"None": "No public holidays", "US": "United States", "GB": "United Kingdom", "IN": "India",
              "CA": "Canada", "AU": "Australia", "DE": "Germany", "FR": "France", "ES": "Spain", "IT": "Italy",
              "NL": "Netherlands", "IE": "Ireland", "BR": "Brazil", "MX": "Mexico", "JP": "Japan", "CN": "China",
@@ -72,17 +72,20 @@ def _load_upload(content: bytes) -> pd.DataFrame:
 
 @st.cache_resource(show_spinner="Training the forecasting model on all products (first run only)…", max_entries=6,
                    ttl=6 * 3600)
-def _model(data_key: str, _sales: pd.DataFrame, _country: str | None, _drivers: pd.DataFrame | None
-           ) -> DemandForecaster:
+def _model(data_key: str, _sales: pd.DataFrame, _country: str | None, _drivers: pd.DataFrame | None,
+           _bulk: tuple[frozenset, frozenset] = (frozenset(), frozenset())) -> DemandForecaster:
     return _disk_cached("model", data_key,
-                        lambda: DemandForecaster(_sales, country=_country, drivers=_drivers).fit())
+                        lambda: DemandForecaster(_sales, country=_country, drivers=_drivers, bulk_keep=_bulk[0],
+                                                 bulk_add=_bulk[1]).fit())
 
 
 @st.cache_resource(show_spinner="Back-testing the model on the last 90 days (first run only)…", max_entries=6,
                    ttl=6 * 3600)
-def _backtest(data_key: str, _sales: pd.DataFrame, _country: str | None, _drivers: pd.DataFrame | None) -> dict:
+def _backtest(data_key: str, _sales: pd.DataFrame, _country: str | None, _drivers: pd.DataFrame | None,
+              _bulk: tuple[frozenset, frozenset] = (frozenset(), frozenset())) -> dict:
     return _disk_cached("backtest", data_key,
-                        lambda: backtest(_sales, holdout_days=90, country=_country, drivers=_drivers))
+                        lambda: backtest(_sales, holdout_days=90, country=_country, drivers=_drivers,
+                                         bulk_keep=_bulk[0], bulk_add=_bulk[1]))
 
 
 @st.cache_data(show_spinner="Checking recent sales against the forecast…", max_entries=12, ttl=6 * 3600)
@@ -103,14 +106,16 @@ class AppState:
     source: str
     country: str | None = None
     drivers: pd.DataFrame | None = None
+    bulk: tuple[frozenset, frozenset] = (frozenset(), frozenset())  # (kept as real demand, marked one-off)
+    base_key: str = ""  # data_key before bulk-order choices were applied
 
     @property
     def fc(self) -> DemandForecaster:
-        return _model(self.data_key, self.sales, self.country, self.drivers)
+        return _model(self.data_key, self.sales, self.country, self.drivers, self.bulk)
 
     @property
     def backtest(self) -> dict:
-        return _backtest(self.data_key, self.sales, self.country, self.drivers)
+        return _backtest(self.data_key, self.sales, self.country, self.drivers, self.bulk)
 
     @property
     def user_id(self) -> int | None:
@@ -274,7 +279,35 @@ def sidebar_data_source() -> AppState | None:
         full_key += f"-fx{rate:.4f}"
     if drivers is not None:
         full_key += "-drv" + hashlib.md5(pd.util.hash_pandas_object(drivers).values.tobytes()).hexdigest()[:10]
-    return AppState(sales=sales, data_key=full_key, source=source, country=country, drivers=drivers)
+    base_key = full_key
+    keep, add = bulk_choices(base_key)
+    if keep or add:
+        full_key += "-blk" + hashlib.md5(repr((sorted(keep), sorted(add))).encode()).hexdigest()[:10]
+    return AppState(sales=sales, data_key=full_key, source=source, country=country, drivers=drivers,
+                    bulk=(keep, add), base_key=base_key)
+
+
+def _bulk_setting(base_key: str) -> str:
+    return f"bulk:{base_key}"
+
+
+def bulk_choices(base_key: str) -> tuple[frozenset, frozenset]:
+    """Days the user said are real demand (keep) or one-off bulk orders (add), for this dataset."""
+    got = st.session_state.get(_bulk_setting(base_key))
+    if got is None:
+        uid = account.current_user()
+        got = db.get_setting(uid, _bulk_setting(base_key)) if uid else None
+        got = got or {"keep": [], "add": []}
+        st.session_state[_bulk_setting(base_key)] = got
+    return (frozenset(tuple(x) for x in got["keep"]), frozenset(tuple(x) for x in got["add"]))
+
+
+def set_bulk_choices(base_key: str, keep: set, add: set) -> None:
+    got = {"keep": sorted(list(x) for x in keep), "add": sorted(list(x) for x in add)}
+    st.session_state[_bulk_setting(base_key)] = got
+    uid = account.current_user()
+    if uid:
+        db.set_setting(uid, _bulk_setting(base_key), got)
 
 
 @st.cache_data(show_spinner=False, max_entries=4, ttl=3600)
