@@ -67,6 +67,9 @@ your own data, choose **Upload my CSV** in the sidebar. You can download a templ
 - **Data check.** Uploaded files are checked before training for unreadable rows, future dates, duplicate rows,
   returns, odd prices, long gaps and products with little history. Each problem is explained with examples and a
   choice of fix; nothing is changed silently. A deliberately messy example file is included to try it.
+- **Product life stages.** Each product is labelled launching, growing, mature, declining or end of life from its
+  age, growth against the same months last year and distance from its best 90 days, with stock advice for each
+  stage. Demand planning shows the stage and warns when end-of-life products are still on the order list.
 - **Explore sales patterns.** Trend, seasonality, weekday × month heatmap, year-over-year, promo lift, price
   elasticity, unusual-day detection and product comparison.
 - **Portfolio overview.** Revenue by category, category growth, ABC × XYZ segmentation and momentum.
