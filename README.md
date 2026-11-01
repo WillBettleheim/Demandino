@@ -74,6 +74,10 @@ your own data, choose **Upload my CSV** in the sidebar. You can download a templ
   from Open-Meteo (free, no key): past weather, the 16-day forecast, then the local climate normal. Only the
   place's location and dates are sent. On the real UCI gift shop it made no measurable difference (weekly error
   47.3% either way), so it's off by default and meant for weather-sensitive products.
+- **Bought together.** From order lines (one row per product per order), finds pairs bought together more often
+  than chance, suggests bundles and "goes well with" pairings, and warns before dropping a declining product
+  that customers often buy with a steady seller. The real UCI orders are included
+  (`data/uci_online_retail_baskets.csv`, made by `scripts/prepare_uci.py`); upload your own on the page.
 - **Explore sales patterns.** Trend, seasonality, weekday × month heatmap, year-over-year, promo lift, price
   elasticity, unusual-day detection and product comparison.
 - **Portfolio overview.** Revenue by category, category growth, ABC × XYZ segmentation and momentum.
