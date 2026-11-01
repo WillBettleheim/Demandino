@@ -36,6 +36,9 @@ if stock_key not in st.session_state:
     saved = db.get_setting(uid, f"stock:{A.data_key}") if uid else None
     st.session_state[stock_key] = pd.DataFrame(saved) if saved else default_stock(A.sales)
 base = st.session_state[stock_key].copy()
+for col in ("shelf_life", "expires_in"):  # tables saved before shelf life existed
+    if col not in base:
+        base[col] = 0
 if st.session_state.get("pl_lead_applied") != default_lead:
     base["lead_time"] = default_lead
     st.session_state[stock_key] = base
@@ -60,13 +63,19 @@ with st.expander("Stock, warehouses & ordering rules — edit to match your busi
                                 "moq": st.column_config.NumberColumn("MOQ", min_value=0, step=1, default=0),
                                 "case_pack": st.column_config.NumberColumn("Case pack", min_value=1, step=1, default=1),
                                 "unit_cost": st.column_config.NumberColumn(f"Unit cost ({ui.currency()})",
-                                                                           min_value=0.0, format="%.2f")})
+                                                                           min_value=0.0, format="%.2f"),
+                                "shelf_life": st.column_config.NumberColumn(
+                                    "Shelf life (days)", min_value=0, max_value=3650, step=1, default=0,
+                                    help="How long a new delivery stays sellable. 0 = doesn't expire."),
+                                "expires_in": st.column_config.NumberColumn(
+                                    "Current stock expires in (days)", min_value=0, max_value=3650, step=1, default=0,
+                                    help="Days left on the stock you have now. 0 = a full shelf life.")})
     names = A.products.set_index("product_id")
     edited = edited.dropna(subset=["product_id"]).copy()
     edited["product_name"] = edited["product_id"].map(names["product_name"])
     edited["category"] = edited["product_id"].map(names["category"])
     edited = edited.fillna({"warehouse": "Main", "demand_share": 100, "stock": 0, "lead_time": default_lead, "moq": 0,
-                            "case_pack": 1, "unit_cost": 0.0})
+                            "case_pack": 1, "unit_cost": 0.0, "shelf_life": 0, "expires_in": 0})
     b1, b2 = st.columns(2)
     if b1.button("Reset to illustrative values", icon=":material/restart_alt:"):
         st.session_state[stock_key] = default_stock(A.sales)
@@ -97,6 +106,29 @@ with st.container(horizontal=True):
               delta=f"{int(counts['Deferred (budget)'])} deferred" if counts["Deferred (budget)"] else None,
               delta_color="off", delta_arrow="off")
 
+perishable = plan[plan["shelf_life"] > 0]
+if not perishable.empty:
+    waste = perishable[perishable["expiring_units"] > 0.5].sort_values("expiring_value", ascending=False)
+    capped = perishable[perishable["order_capped"]]
+    forced = perishable[perishable["order_waste"] > 0.5]
+    lines = []
+    if len(waste):
+        lines.append(f"**{ui.num(waste['expiring_units'].sum())} units** (about "
+                     f"{ui.money(waste['expiring_value'].sum())} at cost) are likely to expire before they sell: "
+                     + ", ".join(f"{r.product_name} ({ui.num(r.expiring_units)})" for r in waste.head(4).itertuples())
+                     + ". Consider a markdown on **Clear slow stock**, or moving them to where they sell faster.")
+    if len(capped):
+        lines.append(f"{len(capped)} order{'s were' if len(capped) > 1 else ' was'} reduced to what can sell before "
+                     "expiring: " + ", ".join(capped["product_name"].head(4)) + ".")
+    if len(forced):
+        lines.append("Minimum order or case-pack rules force buying more than can sell in time for "
+                     + ", ".join(f"{r.product_name} (~{ui.num(r.order_waste)} units)" for r in forced.head(4).itertuples())
+                     + " — ask the supplier for smaller orders.")
+    if lines:
+        st.warning("  \n".join(line.replace("$", "\\$") for line in lines), icon=":material/timer:")
+    else:
+        st.caption(f":material/timer: {len(perishable)} perishable product(s): stock and orders sell before expiring.")
+
 filt = st.pills("Show", STATUS_ORDER, selection_mode="multi", default=STATUS_ORDER, key="pl_filter")
 view = plan[plan["status"].isin(filt or STATUS_ORDER)].copy()
 icons = {"Order now": "🔴 Order now", "Order this week": "🟠 Order this week", "Plan order": "🟡 Plan order",
@@ -104,7 +136,8 @@ icons = {"Order now": "🔴 Order now", "Order this week": "🟠 Order this week
 view["status"] = view["status"].astype(str).map(icons)
 st.dataframe(
     view[["status", "product_name", "warehouse", "trend", "recent_daily", "forecast_daily", "forecast_units", "stock",
-          "days_of_cover", "stockout_date", "reorder_date", "suggested_qty", "order_qty", "order_cost", "revenue"]],
+          "days_of_cover", "stockout_date", "reorder_date", "suggested_qty", "order_qty", "order_cost", "revenue"]
+         + (["expiring_units"] if (plan["shelf_life"] > 0).any() else [])],
     hide_index=True, width="stretch", height=min(42 + 35 * len(view), 640),
     column_config={
         "status": "Status", "product_name": "Product", "warehouse": "Warehouse",
@@ -123,6 +156,8 @@ st.dataframe(
         "reorder_date": st.column_config.DateColumn("Order by", format="D MMM"),
         "order_qty": st.column_config.NumberColumn("Order qty", format="%,.0f", help="After MOQ and case packs."),
         "revenue": st.column_config.NumberColumn(f"Revenue ({ui.currency()})", format="%,.0f"),
+        "expiring_units": st.column_config.NumberColumn("Will expire", format="%,.0f",
+                                                        help="Units of current stock likely to expire before they sell."),
     })
 
 to_order = plan[plan["status"].isin(["Order now", "Order this week"])]
