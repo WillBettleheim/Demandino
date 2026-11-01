@@ -5,7 +5,7 @@ from streamlit.testing.v1 import AppTest
 from demandino.legal import TERMS_VERSION
 
 PAGES = ["views/forecast.py", "views/planning.py", "views/advisor.py", "views/explore.py", "views/overview.py",
-         "views/accuracy.py", "views/help.py", "views/terms.py"]
+         "views/accuracy.py", "views/alerts.py", "views/clearance.py", "views/help.py", "views/terms.py"]
 
 
 def _new_app(accept: bool = True) -> AppTest:
@@ -134,3 +134,43 @@ def test_welcome_guide_summary_and_start_over():
     at.button(key="fc_reset").click().run()
     assert not at.exception, at.exception
     assert at.select_slider(key="fc_h").value == 90
+
+
+def test_alert_opens_product_and_keeps_the_data_source():
+    at = _forecast_app()
+    at.segmented_control(key="data_source").set_value("Real store").run()
+    at.switch_page("views/alerts.py").run()
+    assert not at.exception, at.exception
+    opens = [b for b in at.button if b.key and b.key.startswith("al_open_")]
+    assert opens, "the real store data should have at least one flagged product"
+    pid = opens[0].key.removeprefix("al_open_")
+    opens[0].click().run()
+    assert at.segmented_control(key="data_source").value == "Real store"
+    assert at.selectbox(key="fc_pid").value == pid
+
+
+def test_tracking_an_adjusted_forecast_keeps_the_model_version():
+    import secrets as _s
+
+    import numpy as np
+    import pandas as pd
+
+    from demandino import db
+    from demandino.scenario import ForecastInputs
+    uid = db.create_user("t" + _s.token_hex(4), "a very long password")
+    at = _new_app()
+    at.session_state["user_id"] = uid
+    at.run()
+    start = pd.Timestamp(at.session_state["_app"].last_date) + pd.Timedelta(days=1)
+    at.session_state["load_scenario"] = ForecastInputs(
+        False, "P001", "Earbuds", "Electronics", 250.0, 140.0, 30, start,
+        events=(("Campaign", (start + pd.Timedelta(days=3)).date(), (start + pd.Timedelta(days=9)).date(), 50.0),))
+    at.run()
+    next(b for b in at.button if b.label == "Track this forecast").click().run()
+    assert not at.exception, at.exception
+    p = db.list_forecasts(uid)[0]["payload"]
+    assert p["adjustments"][0][0] == "Campaign"
+    ratio = np.asarray(p["mean"]) / np.maximum(np.asarray(p["base_mean"]), 1e-9)
+    assert np.allclose(ratio[3:10], 1.5, atol=0.01) and np.allclose(ratio[:3], 1.0, atol=0.01)
+    at.switch_page("views/tracking.py").run()
+    assert not at.exception, at.exception

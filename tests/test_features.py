@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from demandino import db, integrations as ig
+from demandino import adjustments, clearance, db, integrations as ig, monitor
 from demandino.analysis import elasticities, promo_spillover
 from demandino.data import generate_sample_data
 from demandino.model import DemandForecaster, demand_class, detect_stockouts, holiday_dates
@@ -145,3 +145,46 @@ def test_scenario_json_roundtrip_pdf_and_spillover(fc, sales):
     assert pdf[:4] == b"%PDF" and len(pdf) > 2000
     sp = promo_spillover(sales, "P001")
     assert set(sp["product_id"]) and sp["effect"].abs().max() < 1
+
+
+# ------------------------------------------- adjustments, drift and clearance
+def test_adjustment_scoring_rewards_the_better_forecast(sales):
+    pid = "P001"
+    dates = pd.date_range(sales["date"].max() - pd.Timedelta(days=13), periods=14)
+    actual = sales[sales["product_id"] == pid].set_index("date")["units_sold"].reindex(dates).to_numpy()
+    model = actual * 0.5  # the model badly under-forecast…
+    yours = model.copy()
+    yours[:7] = actual[:7]  # …your +100% adjustment fixed the first week only
+    log = {"id": 1, "product_id": pid, "product_name": "Earbuds",
+           "payload": {"dates": [d.strftime("%Y-%m-%d") for d in dates], "mean": yours.tolist(),
+                       "base_mean": model.tolist(), "lower": [0] * 14, "upper": [0] * 14,
+                       "adjustments": [["Campaign", str(dates[0].date()), str(dates[6].date()), 100.0],
+                                       ["Ignored", str(dates[7].date()), str(dates[13].date()), 0.0]]}}
+    scored = adjustments.score([log], sales)
+    assert scored.set_index("adjustment").loc["Campaign", "verdict"] == "Helped"
+    assert scored.set_index("adjustment").loc["Ignored", "verdict"] == "No difference"
+    assert adjustments.summary(scored)["error_change"] < 0
+
+
+def test_drift_flags_a_product_whose_sales_jumped(sales):
+    jumped = sales.copy()
+    recent = (jumped["product_id"] == "P001") & (jumped["date"] > jumped["date"].max() - pd.Timedelta(days=28))
+    jumped.loc[recent, "units_sold"] *= 3
+    fc = DemandForecaster(jumped, max_iter=60).fit(calibrate=False)
+    fc.conformal_q, fc.level_uncertainty = 0.2, 0.15
+    old, cutoff = monitor.holdout_model(fc)
+    rep = monitor.drift_report(old, cutoff).set_index("product_id")
+    assert rep.loc["P001", "flagged"] and rep.loc["P001", "direction"] == "Above"
+    assert rep["flagged"].mean() < 0.5  # most untouched products stay on track
+    assert any("P001" in line or rep.loc["P001", "product_name"] in line for line in monitor.drift_lines(rep.reset_index()))
+
+
+def test_clearance_marks_down_only_overstocked_products(fc, sales):
+    stock = default_stock(sales)
+    stock["stock"] = 0
+    stock.loc[stock["product_id"] == "P001", "stock"] = 100_000
+    plan = clearance.clearance_plan(fc, stock, {"P001": -2.0}, window=60, target_days=90).set_index("product_id")
+    assert plan.loc["P001", "slow"] and 0 < plan.loc["P001", "discount"] <= 0.5
+    assert plan.loc["P001", "cash_freed"] > 0
+    assert not plan.drop(index="P001")["slow"].any()
+    assert "Mark down" in clearance.advice(plan.loc["P001"])
