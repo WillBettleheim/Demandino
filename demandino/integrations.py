@@ -219,7 +219,7 @@ def alert_lines(plan: pd.DataFrame, stockout_days: int = 14, change_pct: float =
                    f"{r.days_of_cover} days of cover — order {r.order_qty:,.0f} units.")
     soon = plan[plan["stockout_date"].notna()]
     for r in soon.itertuples():
-        days = (pd.Timestamp(r.stockout_date) - plan.attrs.get("today", pd.Timestamp(r.stockout_date))).days
+        days = (pd.Timestamp(r.stockout_date) - pd.Timestamp(plan.attrs.get("today", r.stockout_date))).days
         if 0 <= days <= stockout_days and str(r.status) != "Order now":
             out.append(f"STOCK-OUT SOON · {r.product_name}: runs out around {pd.Timestamp(r.stockout_date):%d %b}.")
     if "expiring_units" in plan:
