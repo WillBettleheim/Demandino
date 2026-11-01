@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from demandino import ui
-from demandino.analysis import product_profile
+from demandino.analysis import elasticity_effect, product_profile
 from demandino.components import findings, show_patterns
 from demandino.model import detect_bulk_orders
 from demandino.state import app, set_bulk_choices
@@ -36,8 +36,7 @@ if not np.isnan(prof["promo_lift"]):
     lines.append(f"Promotions ran on {prof['promo_share'] * 100:.0f}% of days and lifted sales by "
                  f"**{prof['promo_lift'] * 100:+.0f}%** on average.")
 if not np.isnan(prof["elasticity"]):
-    lines.append(f"Price elasticity **{prof['elasticity']:.2f}**: a 10% price cut has lifted units by about "
-                 f"{(0.9 ** prof['elasticity'] - 1) * 100:.0f}%.")
+    lines.append(f"Price elasticity **{prof['elasticity']:.2f}**: {elasticity_effect(prof['elasticity'])}.")
 if not np.isnan(prof["cv"]):
     vol = "very volatile" if prof["cv"] > 0.8 else "moderately volatile" if prof["cv"] > 0.4 else "stable"
     lines.append(f"Daily demand is **{vol}** (coefficient of variation {prof['cv']:.2f}).")
