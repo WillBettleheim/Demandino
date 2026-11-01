@@ -3,6 +3,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from demandino import db, ui, whatif
+from demandino.security import safe_csv
 from demandino.state import app
 
 A = app()
@@ -88,3 +89,5 @@ with st.expander(f"All products ({len(df)})", icon=":material/table_rows:"):
 st.caption("Price changes use each product's price sensitivity; sales use what the model learned about promotion "
            "days. Profit uses your saved unit costs, or 55% of the price where none is saved. Treat it as an estimate "
            "and test individual products on the Forecast page.")
+st.download_button("Download what-if results (CSV)", safe_csv(df), "store_what_if.csv", "text/csv", icon=":material/download:",
+                   key="dl_store_what_if")

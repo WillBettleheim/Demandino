@@ -3,6 +3,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from demandino import db, lostsales, ui
+from demandino.security import safe_csv
 from demandino.state import app
 
 A = app()
@@ -57,3 +58,5 @@ with st.expander(f"All products ({len(prod)})", icon=":material/table_rows:"):
 st.caption("Stock-out days are runs of zero sales for products that normally sell (or days your stock data shows "
            "none). Demand on those days is estimated from the days around them, so treat figures as estimates.")
 st.page_link("views/planning.py", label="Prevent the next one on Demand planning", icon=":material/inventory:")
+st.download_button("Download lost sales by product (CSV)", safe_csv(prod), "lost_sales.csv", "text/csv", icon=":material/download:",
+                   key="dl_lost_sales")

@@ -3,6 +3,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from demandino import changes, ui
+from demandino.security import safe_csv
 from demandino.state import app
 
 A = app()
@@ -59,3 +60,5 @@ with st.expander(f"All products ({len(df)})", icon=":material/table_rows:"):
         "last_week_actual": st.column_config.NumberColumn("Sold last week", format="%,.0f"),
         "last_week_expected": st.column_config.NumberColumn("Expected last week", format="%,.0f"),
         "why": st.column_config.TextColumn("Why", width="large")})
+st.download_button("Download forecast changes (CSV)", safe_csv(df), "forecast_changes.csv", "text/csv", icon=":material/download:",
+                   key="dl_forecast_changes")
