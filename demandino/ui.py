@@ -164,6 +164,26 @@ div[data-testid="stMetricValue"] {font-family: "Space Grotesk", Inter, sans-seri
 .dm-finding .dm-ft {display: block; font-size: .68rem; letter-spacing: .14em; text-transform: uppercase;
   color: var(--b); margin-bottom: .3rem; font-weight: 700;}
 
+/* First-run guide: numbered steps */
+.st-key-dm_welcome {background: var(--hero-bg); border: 1px solid var(--edge-hi); border-radius: 1.1rem;
+  padding: 1rem 1.15rem; box-shadow: var(--glow);}
+.dm-welcome-title {font-family: "Space Grotesk", Inter, sans-serif; font-weight: 700; font-size: 1.1rem;
+  margin-bottom: .7rem; color: var(--ink);}
+.dm-steps {display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: .7rem;}
+.dm-step {display: flex; gap: .7rem; align-items: flex-start; padding: .75rem .85rem; border-radius: .9rem;
+  background: var(--glass); border: 1px solid var(--edge);}
+.dm-step > span {flex: none; width: 1.75rem; height: 1.75rem; border-radius: 50%; display: grid; place-items: center;
+  font-weight: 700; color: #fff; background: linear-gradient(135deg, #14B8A6, #F97350);}
+.dm-step b {color: var(--ink);} .dm-step p {margin: .15rem 0 0; font-size: .86rem; color: var(--ink-2); line-height: 1.4;}
+
+/* "In short": the forecast as plain sentences with the next action */
+.dm-bottom {padding: .9rem 1.1rem; border-radius: 1rem; background: var(--glass); border: 1px solid var(--edge);
+  border-left: 4px solid var(--a); box-shadow: var(--glow);}
+.dm-bottom.warn {border-left-color: #F59E0B;} .dm-bottom.good {border-left-color: #22C55E;}
+.dm-bottom .dm-bottom-label {font-size: .68rem; letter-spacing: .14em; text-transform: uppercase; font-weight: 700;
+  color: var(--b); margin-bottom: .25rem;}
+.dm-bottom p {margin: .2rem 0; font-size: .97rem; line-height: 1.5; color: var(--ink);}
+
 /* Stat strip: small headline numbers in a row */
 .dm-strip {display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .6rem; margin: .2rem 0 .4rem;}
 .dm-stat {padding: .75rem .9rem; border-radius: .9rem; background: var(--glass); border: 1px solid var(--edge);}
