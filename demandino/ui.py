@@ -24,7 +24,7 @@ LAST_YEAR = "#3B82F6"
 PALETTE = ["#14B8A6", "#F97350", "#3B82F6", "#F59E0B", "#EC4899", "#8B5CF6", "#22C55E", "#64748B"]
 SEQ = [[0, "rgba(20,184,166,0.06)"], [0.5, "#14B8A6"], [1, "#F97350"]]  # heatmaps
 
-PAGE_PATHS = ["/", "/planning", "/advisor", "/targets", "/alerts", "/changes", "/clearance", "/explore",
+PAGE_PATHS = ["/", "/planning", "/advisor", "/targets", "/whatif", "/alerts", "/changes", "/clearance", "/explore",
               "/overview", "/hierarchy", "/lifecycle", "/together", "/lostsales", "/assistant", "/workspace",
               "/datacheck", "/connections", "/orders", "/accuracy", "/tracking", "/help", "/terms"]
 
@@ -359,7 +359,8 @@ def _md_bold(text: str) -> str:
 # Accent per finding: what needs action (warn), what is good news, what is the headline (acc).
 FINDING_TONES = {"expected demand": "acc", "inventory": "warn", "demand type": "warn", "stock-outs": "warn",
                  "anomalies": "warn", "careful before dropping": "warn", "pricing": "good", "promotion impact": "good",
-                 "bundle or suggest": "good", "events": "acc"}
+                 "bundle or suggest": "good", "best version": "good", "mostly worth it": "good",
+                 "not worth it": "warn", "not worth it across the board": "warn", "events": "acc"}
 
 
 def finding_cards(lines: list[str]) -> None:

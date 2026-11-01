@@ -54,6 +54,9 @@ your own data, choose **Upload my CSV** in the sidebar. You can download a templ
 - **What changed.** Each product's forecast now vs a week ago, with the reason in plain words ("Down 4% … mainly
   last week's sales (−180); last year's pattern (+32). Last week sold 549 — less than the 633 expected") and a
   waterfall of the parts: last week's sales, last year's pattern, being a week closer, price vs recent weeks.
+- **Store what-if.** Apply one change — all prices +5%, 20% off a category for a week — to the whole shop, some
+  categories or chosen products, and see units, revenue and profit before and after, by category and product,
+  with which products gain or lose and the result if you applied it only to the winners.
 - **Demand alerts.** A copy of the model trained without the last 4 (or 6, 8) weeks forecasts them, and products
   whose real weekly sales kept landing outside its range on the same side are flagged as selling faster or slower
   than expected, with advice and a link to the product. The alerts are also added to the weekly digest.
