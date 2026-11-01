@@ -42,6 +42,7 @@ pages = {
         st.Page("views/hierarchy.py", title="Store & category totals", icon=":material/account_tree:"),
         st.Page("views/lifecycle.py", title="Product life stages", icon=":material/timeline:"),
         st.Page("views/together.py", title="Bought together", icon=":material/shopping_basket:"),
+        st.Page("views/lostsales.py", title="Lost sales", icon=":material/money_off:"),
         st.Page("views/assistant.py", title="Ask Demandino", icon=":material/auto_awesome:"),
     ],
     "Workspace": [
