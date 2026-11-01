@@ -51,6 +51,9 @@ your own data, choose **Upload my CSV** in the sidebar. You can download a templ
 - **Sales targets.** Set a target for a month, a quarter or custom dates, in units or revenue, for the whole shop,
   a category or a product. It adds the forecast for the days left to what's been sold, gives the chance of making
   it, and says what would close a gap (price, promotions, which products to push). Signed-in users can save targets.
+- **What changed.** Each product's forecast now vs a week ago, with the reason in plain words ("Down 4% … mainly
+  last week's sales (−180); last year's pattern (+32). Last week sold 549 — less than the 633 expected") and a
+  waterfall of the parts: last week's sales, last year's pattern, being a week closer, price vs recent weeks.
 - **Demand alerts.** A copy of the model trained without the last 4 (or 6, 8) weeks forecasts them, and products
   whose real weekly sales kept landing outside its range on the same side are flagged as selling faster or slower
   than expected, with advice and a link to the product. The alerts are also added to the weekly digest.
