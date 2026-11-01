@@ -299,3 +299,26 @@ def test_plan_reorders_earlier_and_caps_orders_for_perishables(fc, sales):
     forced, _ = portfolio_plan(fc, 0.15, stock.assign(stock=0, shelf_life=7, moq=5000), 60, 14, 0.95)
     assert forced.loc[0, "order_waste"] > 0
     assert any("EXPIRING" in line for line in ig.alert_lines(fresh))
+
+
+# ------------------------------------------------------------- life stages
+def _series(levels: list[float], days_each: int = 120) -> pd.DataFrame:
+    units = np.concatenate([np.full(days_each, lv) for lv in levels])
+    return pd.DataFrame({"date": pd.date_range("2024-01-01", periods=len(units)), "units_sold": units})
+
+
+def test_life_stages_follow_the_sales_curve():
+    from demandino import lifecycle
+    assert lifecycle.classify(_series([5.0], 60))["stage"] == "Launching"
+    assert lifecycle.classify(_series([10, 10, 10, 10, 10, 10]))["stage"] == "Mature"
+    assert lifecycle.classify(_series([10, 10, 10, 14, 14, 14]))["stage"] == "Growing"
+    assert lifecycle.classify(_series([10, 10, 10, 6, 6, 6]))["stage"] == "Declining"
+    assert lifecycle.classify(_series([10, 10, 10, 2, 2, 2]))["stage"] == "End of life"
+
+
+def test_life_stages_for_every_product(sales):
+    from demandino import lifecycle
+    st_df = lifecycle.stages(sales)
+    assert len(st_df) == sales["product_id"].nunique()
+    assert set(st_df["stage"].astype(str)) <= set(lifecycle.STAGES)
+    assert st_df["advice"].str.len().min() > 20

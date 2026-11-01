@@ -33,6 +33,8 @@ PAGES = [
      "Which products and categories matter most, and which are growing."),
     ("views/hierarchy.py", "Store & category totals", ":material/account_tree:",
      "Forecasts added up for each category and the whole shop."),
+    ("views/lifecycle.py", "Product life stages", ":material/timeline:",
+     "Which products are launching, growing, mature, declining or at the end — and what that means for stock."),
     ("views/assistant.py", "Ask Demandino", ":material/auto_awesome:",
      "Ask questions about a forecast in plain language."),
     ("views/datacheck.py", "Data check", ":material/rule:",
