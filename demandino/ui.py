@@ -190,6 +190,7 @@ div[data-testid="stMetricValue"] {font-family: "Space Grotesk", Inter, sans-seri
 .dm-stat b {display: block; font-family: "Space Grotesk", Inter, sans-serif; font-size: 1.45rem; font-weight: 700;
   font-variant-numeric: tabular-nums; color: var(--ink);}
 .dm-stat span {font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2);}
+.dm-stat small {display: block; font-size: .8rem; color: var(--ink-2); margin-top: .1rem;}
 ::-webkit-scrollbar {width: 10px; height: 10px;}
 ::-webkit-scrollbar-thumb {background: var(--edge-hi); border-radius: 10px;}
 

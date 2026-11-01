@@ -16,13 +16,16 @@ STATUS_ORDER = ["Order now", "Order this week", "Plan order", "Healthy", "Deferr
 
 
 def default_stock(sales: pd.DataFrame, seed: int = 7) -> pd.DataFrame:
-    """Illustrative starting stock (5–60 days of recent demand) so the plan has something to show."""
+    """Illustrative starting stock (5–60 days of recent demand, a few overstocked at 150–300 days) so the plan and
+    the clearance advice have something to show."""
     rng = np.random.default_rng(seed)
     recent = sales.groupby("product_id").apply(lambda g: g.sort_values("date")["units_sold"].tail(LEVEL_WINDOW).mean(),
                                                include_groups=False)
     meta = sales.groupby("product_id")[["product_name", "category"]].first()
     price = sales.sort_values("date").groupby("product_id")["regular_price"].last()
     days = rng.integers(5, 61, len(recent))
+    over = rng.random(len(recent)) < 0.15
+    days[over] = rng.integers(150, 301, over.sum())
     return pd.DataFrame({
         "product_id": recent.index, "product_name": meta.loc[recent.index, "product_name"].to_numpy(),
         "category": meta.loc[recent.index, "category"].to_numpy(), "warehouse": "Main",
