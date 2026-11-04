@@ -7,7 +7,14 @@ enableXsrfProtection = true
 enableCORS = true
 runOnSave = false
 
+# Don't watch files or evaluate bare expressions on the page in production.
+fileWatcherType = "none"
+
+[runner]
+magicEnabled = false
+
 [client]
+showErrorLinks = false
 # Show users a short error message, never source code or stack traces.
 showErrorDetails = "type"
 toolbarMode = "viewer"
