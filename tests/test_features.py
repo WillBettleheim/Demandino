@@ -573,3 +573,15 @@ def test_change_history_records_edits_but_not_preferences():
     assert "approved by Sam" in got[0]["detail"]
     other = db.create_user("history_other", "a very long password")
     assert db.list_activity(other) == []  # private to each account
+
+
+def test_shop_report_is_an_excel_file_with_safe_text(sales):
+    import io
+
+    from demandino import lifecycle
+    from demandino.report import shop_workbook
+    items = [{"priority": "now", "title": "Order now", "text": "=HYPERLINK(\"http://evil\")"}]
+    data = shop_workbook([("Sales", 100)], items, lifecycle.stages(sales), pd.DataFrame({"product_name": ["Mug"]}))
+    got = pd.read_excel(io.BytesIO(data), sheet_name=None)
+    assert set(got) == {"Summary", "Needs attention", "Life stages", "Lost sales"}
+    assert got["Needs attention"].loc[0, "Detail"].startswith("'=")

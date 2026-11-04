@@ -6,7 +6,7 @@ from demandino.legal import TERMS_VERSION
 
 PAGES = ["views/forecast.py", "views/planning.py", "views/advisor.py", "views/explore.py", "views/overview.py",
          "views/accuracy.py", "views/alerts.py", "views/clearance.py", "views/targets.py", "views/datacheck.py",
-         "views/home.py", "views/lifecycle.py", "views/together.py", "views/changes.py", "views/lostsales.py",
+         "views/home.py", "views/compare.py", "views/lifecycle.py", "views/together.py", "views/changes.py", "views/lostsales.py",
          "views/whatif.py", "views/budget.py", "views/inbox.py", "views/help.py", "views/terms.py"]
 
 
@@ -98,7 +98,7 @@ def test_theme_toggle_emits_switch_script():
 
 SIGNED_IN_PAGES = ["views/workspace.py", "views/connections.py", "views/orders.py", "views/tracking.py",
                    "views/hierarchy.py", "views/assistant.py", "views/targets.py", "views/inbox.py",
-                   "views/home.py", "views/history.py"]
+                   "views/home.py", "views/history.py", "views/security.py"]
 
 
 @pytest.mark.parametrize("page", SIGNED_IN_PAGES)
