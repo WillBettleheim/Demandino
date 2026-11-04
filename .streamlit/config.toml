@@ -15,7 +15,7 @@ toolbarMode = "viewer"
 [browser]
 gatherUsageStats = false
 
-# "Lagoon" theme: deep-sea dark and a bright, airy light mode. Switch with the sun/moon toggle in the sidebar.
+# "Harbor" theme: deep navy dark and a crisp, cool light mode. Switch with the sun/moon toggle in the sidebar.
 [theme]
 base = "dark"
 font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
@@ -24,30 +24,30 @@ baseRadius = "0.9rem"
 buttonRadius = "0.75rem"
 showWidgetBorder = true
 metricValueFontWeight = 700
-chartCategoricalColors = ["#14B8A6", "#F97350", "#3B82F6", "#F59E0B", "#EC4899", "#8B5CF6", "#22C55E", "#64748B"]
+chartCategoricalColors = ["#2F86E0", "#D4702B", "#16A095", "#BE8A1E", "#D9547F", "#6C9A30"]
 
 [theme.dark]
-primaryColor = "#2DD4BF"
-backgroundColor = "#050B12"
-secondaryBackgroundColor = "#0D1A26"
-textColor = "#E6F1F5"
-borderColor = "#17293A"
-linkColor = "#5EEAD4"
+primaryColor = "#5CA8F5"
+backgroundColor = "#0E1520"
+secondaryBackgroundColor = "#18222F"
+textColor = "#E8EEF4"
+borderColor = "#26323F"
+linkColor = "#8CC2F8"
 
 [theme.dark.sidebar]
-backgroundColor = "#07111B"
-secondaryBackgroundColor = "#0F1E2C"
-borderColor = "#17293A"
+backgroundColor = "#0A1018"
+secondaryBackgroundColor = "#151E29"
+borderColor = "#26323F"
 
 [theme.light]
-primaryColor = "#0D9488"
-backgroundColor = "#F5FAFB"
-secondaryBackgroundColor = "#E7F1F3"
-textColor = "#0B1F2A"
-borderColor = "#D3E3E7"
-linkColor = "#0F766E"
+primaryColor = "#1D6FCF"
+backgroundColor = "#F6F8FA"
+secondaryBackgroundColor = "#E9EEF3"
+textColor = "#14202E"
+borderColor = "#D6DEE6"
+linkColor = "#1A63BA"
 
 [theme.light.sidebar]
-backgroundColor = "#EDF6F7"
-secondaryBackgroundColor = "#E0EDF0"
-borderColor = "#D3E3E7"
+backgroundColor = "#EEF2F6"
+secondaryBackgroundColor = "#E2E8EE"
+borderColor = "#D6DEE6"
