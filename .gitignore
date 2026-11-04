@@ -8,3 +8,17 @@ data/raw/
 .DS_Store
 .claude/
 .data/
+# Secrets and private data must never be committed
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.db
+*.sqlite
+*.sqlite3
+*.pkl
+secrets.*
+credentials*
