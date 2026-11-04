@@ -44,6 +44,21 @@ def sign_out() -> None:
     st.session_state["_session_cookie"] = ("clear", "")
 
 
+def _client_ip() -> str | None:
+    try:
+        return st.context.ip_address
+    except Exception:  # noqa: BLE001 - no browser context (tests)
+        return None
+
+
+def _secure_flag() -> str:
+    """Over HTTPS the sign-in cookie is never sent on an unencrypted connection."""
+    try:
+        return "; Secure" if str(st.context.url or "").startswith("https://") else ""
+    except Exception:  # noqa: BLE001 - no browser context (tests)
+        return ""
+
+
 def sync_cookie() -> None:
     action = st.session_state.pop("_session_cookie", None)
     if not action:
@@ -51,7 +66,7 @@ def sync_cookie() -> None:
     kind, token = action
     if kind == "set" and token.replace("-", "").replace("_", "").isalnum():
         st.html(f"<script>document.cookie='{COOKIE}={token}; Max-Age={db.SESSION_DAYS * 86400}; Path=/; "
-                "SameSite=Strict';</script>", unsafe_allow_javascript=True)
+                f"SameSite=Strict{_secure_flag()}';</script>", unsafe_allow_javascript=True)
     elif kind == "clear":
         st.html(f"<script>document.cookie='{COOKIE}=; Max-Age=0; Path=/; SameSite=Strict';</script>",
                 unsafe_allow_javascript=True)
@@ -60,7 +75,7 @@ def sync_cookie() -> None:
 def _attempt_allowed() -> bool:
     n = st.session_state.get("_auth_attempts", 0)
     st.session_state["_auth_attempts"] = n + 1
-    return n < MAX_SESSION_ATTEMPTS
+    return n < MAX_SESSION_ATTEMPTS and not db.ip_blocked(_client_ip())
 
 
 def sidebar_account() -> None:
@@ -86,6 +101,7 @@ def sidebar_account() -> None:
                         _sign_in(db.authenticate(user, pw))
                         st.rerun()
                     except db.AuthError as exc:
+                        db.record_failure(_client_ip())
                         st.error(str(exc))
         with tab_up, st.form("sign_up", border=False):
             st.caption("Accounts are stored on the server running this app. Your saved datasets, scenarios and "

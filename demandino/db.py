@@ -22,6 +22,8 @@ import pandas as pd
 from cryptography.fernet import Fernet, InvalidToken
 
 ROOT = Path(__file__).resolve().parent.parent
+from .security import private_dir
+
 DATA_DIR = Path(os.environ.get("DEMANDINO_DATA_DIR", ROOT / ".data"))
 DB_PATH = DATA_DIR / "demandino.db"
 
@@ -59,6 +61,8 @@ CREATE TABLE IF NOT EXISTS forecast_log (
 CREATE TABLE IF NOT EXISTS shares (
   token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL, created REAL NOT NULL, expires REAL NOT NULL,
   title TEXT NOT NULL, payload TEXT NOT NULL, FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE);
+CREATE TABLE IF NOT EXISTS auth_failures (ip TEXT NOT NULL, at REAL NOT NULL);
+CREATE INDEX IF NOT EXISTS auth_failures_ip ON auth_failures(ip, at);
 CREATE TABLE IF NOT EXISTS activity (
   id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, at REAL NOT NULL, kind TEXT NOT NULL, detail TEXT NOT NULL,
   FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE);
@@ -85,7 +89,7 @@ def _owner_only(path: Path) -> None:
 
 @contextmanager
 def connect():
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    private_dir(DATA_DIR)
     fresh = not DB_PATH.exists()
     con = sqlite3.connect(DB_PATH, timeout=10)
     con.row_factory = sqlite3.Row
@@ -107,7 +111,7 @@ def _fernet() -> Fernet:
     env = os.environ.get("DEMANDINO_SECRET_KEY")
     if env:
         return Fernet(env.encode())
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    private_dir(DATA_DIR)
     path = DATA_DIR / ".secret-key"
     if not path.exists():
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -124,15 +128,47 @@ def _token_hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
+# ----------------------------------------------------- guessing protection
+IP_WINDOW = 15 * 60       # seconds
+IP_MAX_FAILURES = 30      # failed attempts from one address, across all accounts, within the window
+
+
+def ip_blocked(ip: str | None) -> bool:
+    """Stops one address guessing across many accounts, which per-account lockout alone can't catch."""
+    if not ip:
+        return False
+    with connect() as con:
+        con.execute("DELETE FROM auth_failures WHERE at < ?", (time.time() - IP_WINDOW,))
+        n = con.execute("SELECT COUNT(*) AS n FROM auth_failures WHERE ip = ?", (ip,)).fetchone()["n"]
+    return n >= IP_MAX_FAILURES
+
+
+def record_failure(ip: str | None) -> None:
+    if ip:
+        with connect() as con:
+            con.execute("INSERT INTO auth_failures VALUES (?,?)", (ip[:64], time.time()))
+
+
 # --------------------------------------------------------------- accounts
+COMMON_PASSWORDS = {"password123", "password1234", "1234567890", "12345678910", "123456789012", "qwertyuiop",
+                    "qwertyuiop1", "qwerty12345", "iloveyou123", "adminadmin", "admin12345", "letmein1234",
+                    "welcome1234", "changeme123", "1q2w3e4r5t", "1qaz2wsx3edc", "passw0rd123", "abcdefghij",
+                    "abc1234567", "demandino1"}
+
+
+def check_password(password: str, username: str = "") -> None:
+    if len(password) < MIN_PASSWORD:
+        raise AuthError(f"Password must be at least {MIN_PASSWORD} characters.")
+    low = password.lower()
+    if low in COMMON_PASSWORDS or len(set(low)) < 4 or (username and username.lower() in low):
+        raise AuthError("Please choose a less guessable password.")
+
+
 def create_user(username: str, password: str) -> int:
     username = username.strip()
     if not USERNAME_RE.match(username):
         raise AuthError("Username must be 3–32 characters: letters, numbers, dot, dash or underscore.")
-    if len(password) < MIN_PASSWORD:
-        raise AuthError(f"Password must be at least {MIN_PASSWORD} characters.")
-    if password.lower() in {"password123", "1234567890", "qwertyuiop"} or password.lower() == username.lower():
-        raise AuthError("Please choose a less guessable password.")
+    check_password(password, username)
     salt = secrets.token_bytes(16)
     with connect() as con:
         exists = con.execute("SELECT 1 FROM users WHERE username = ?", (username,)).fetchone()
@@ -161,6 +197,8 @@ def authenticate(username: str, password: str) -> int:
             locked = time.time() + LOCK_MINUTES * 60 if failed >= MAX_FAILED else 0
             con.execute("UPDATE users SET failed = ?, locked_until = ? WHERE id = ?",
                         (0 if locked else failed, locked, row["id"]))
+    log_activity(row["id"], "Security", "Signed in" if ok else "Failed sign-in attempt"
+                 + (" — account locked for a while" if not ok and locked else ""))
     if not ok:
         raise AuthError("Wrong username or password.")
     return int(row["id"])
@@ -170,8 +208,8 @@ def change_password(user_id: int, old: str, new: str) -> None:
     with connect() as con:
         name = con.execute("SELECT username FROM users WHERE id = ?", (user_id,)).fetchone()["username"]
     authenticate(name, old)
-    if len(new) < MIN_PASSWORD:
-        raise AuthError(f"Password must be at least {MIN_PASSWORD} characters.")
+    check_password(new, name)
+    log_activity(user_id, "Security", "Password changed")
     salt = secrets.token_bytes(16)
     with connect() as con:
         con.execute("UPDATE users SET pw_hash = ?, salt = ? WHERE id = ?", (_hash_pw(new, salt), salt, user_id))
@@ -196,6 +234,19 @@ def new_session(user_id: int) -> str:
         con.execute("INSERT INTO sessions VALUES (?,?,?)", (_token_hash(token), user_id,
                                                              time.time() + SESSION_DAYS * 86400))
     return token
+
+
+def session_count(user_id: int) -> int:
+    with connect() as con:
+        return con.execute("SELECT COUNT(*) AS n FROM sessions WHERE user_id = ? AND expires > ?",
+                           (user_id, time.time())).fetchone()["n"]
+
+
+def end_all_sessions(user_id: int) -> None:
+    """Sign out everywhere: every browser holding a session for this account must sign in again."""
+    with connect() as con:
+        con.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+    log_activity(user_id, "Security", "Signed out everywhere")
 
 
 def session_user(token: str | None) -> int | None:
@@ -309,6 +360,13 @@ def set_secret(user_id: int, key: str, value: str) -> None:
     with connect() as con:
         con.execute("INSERT INTO secrets VALUES (?,?,?) ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value",
                     (user_id, key, token))
+    log_activity(user_id, "Security", f"Saved key: {key}")  # the name only, never the value
+
+
+def secret_names(user_id: int) -> list[str]:
+    """Which keys are stored, without ever decrypting them."""
+    with connect() as con:
+        return [r["key"] for r in con.execute("SELECT key FROM secrets WHERE user_id = ? ORDER BY key", (user_id,))]
 
 
 def get_secret(user_id: int, key: str) -> str | None:
@@ -325,6 +383,7 @@ def get_secret(user_id: int, key: str) -> str | None:
 def delete_secret(user_id: int, key: str) -> None:
     with connect() as con:
         con.execute("DELETE FROM secrets WHERE user_id = ? AND key = ?", (user_id, key))
+    log_activity(user_id, "Security", f"Removed key: {key}")
 
 
 # ----------------------------------------------------------- forecast log
