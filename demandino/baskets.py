@@ -14,6 +14,7 @@ import io
 
 import numpy as np
 import pandas as pd
+from scipy import sparse
 
 from .security import UploadError, clean_text, read_csv_upload
 
@@ -21,15 +22,17 @@ MIN_TOGETHER = 30   # pairs bought together fewer times than this are too thin t
 MAX_PRODUCTS = 400  # keeps the pair matrix small
 
 
-def matrix(baskets: pd.DataFrame) -> tuple[np.ndarray, list[str], int]:
+def matrix(baskets: pd.DataFrame) -> tuple[sparse.csr_matrix, list[str], int]:
     """Orders × products as 0/1 (only orders and products present), the product ids, and the order count."""
     b = baskets[["order_id", "product_id"]].astype(str).drop_duplicates()
     top = b["product_id"].value_counts().head(MAX_PRODUCTS).index
     b = b[b["product_id"].isin(top)]
     orders = pd.Index(b["order_id"].unique())
     products = sorted(b["product_id"].unique())
-    m = np.zeros((len(orders), len(products)), dtype=np.float32)
-    m[orders.get_indexer(b["order_id"]), pd.Index(products).get_indexer(b["product_id"])] = 1
+    # Sparse: most orders hold few products, so a very large file stays small in memory.
+    m = sparse.csr_matrix((np.ones(len(b), dtype=np.float32),
+                           (orders.get_indexer(b["order_id"]), pd.Index(products).get_indexer(b["product_id"]))),
+                          shape=(len(orders), len(products)))
     return m, products, len(orders)
 
 
@@ -39,7 +42,7 @@ def pairs(baskets: pd.DataFrame, names: dict[str, str] | None = None, min_togeth
     m, products, n = matrix(baskets)
     if n == 0 or len(products) < 2:
         return pd.DataFrame(columns=["a", "b", "together", "share_of_orders", "a_to_b", "b_to_a", "lift"])
-    co = m.T @ m
+    co = (m.T @ m).toarray()
     count = np.diag(co).copy()
     i, j = np.triu_indices(len(products), k=1)
     together = co[i, j]
