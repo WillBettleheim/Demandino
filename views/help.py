@@ -14,7 +14,6 @@ st.page_link("views/forecast.py", label="Go to Forecast a product", icon=":mater
 st.subheader("Which page do I need?")
 PAGES = [
     ("views/home.py", "Home", ":material/home:", "Your shop at a glance: sales, the forecast and what needs you."),
-    ("views/history.py", "Change history", ":material/history:", "What was changed in your workspace, and when."),
     ("views/inbox.py", "Inbox", ":material/inbox:",
      "Everything that needs attention across the app, most urgent first — start here each week."),
     ("views/forecast.py", "Forecast a product", ":material/online_prediction:",
@@ -51,12 +50,17 @@ PAGES = [
      "Products customers buy in the same order — ideas for bundles and suggestions (needs order lines)."),
     ("views/lostsales.py", "Lost sales", ":material/money_off:",
      "What running out of stock has cost, by product and month, and which products keep running out."),
+    ("views/compare.py", "Compare products", ":material/compare_arrows:",
+     "Up to four products side by side: forecast, life stage and revenue."),
     ("views/assistant.py", "Ask Demandino", ":material/auto_awesome:",
      "Ask questions about a forecast in plain language."),
     ("views/datacheck.py", "Data check", ":material/rule:",
      "Problems found in your uploaded file — duplicates, returns, gaps, odd prices — and how to fix them."),
     ("views/accuracy.py", "Model accuracy", ":material/fact_check:",
      "How reliable the forecasts were when tested on sales the model hadn't seen."),
+    ("views/security.py", "Security", ":material/shield:",
+     "Signed-in browsers, stored keys and recent sign-ins; sign out everywhere."),
+    ("views/history.py", "Change history", ":material/history:", "What was changed in your workspace, and when."),
 ]
 cols = st.columns(2)
 for i, (path, title, icon, what) in enumerate(PAGES):
