@@ -6,7 +6,7 @@ from demandino.legal import TERMS_VERSION
 
 PAGES = ["views/forecast.py", "views/planning.py", "views/advisor.py", "views/explore.py", "views/overview.py",
          "views/accuracy.py", "views/alerts.py", "views/clearance.py", "views/targets.py", "views/datacheck.py",
-         "views/lifecycle.py", "views/together.py", "views/changes.py", "views/lostsales.py",
+         "views/home.py", "views/lifecycle.py", "views/together.py", "views/changes.py", "views/lostsales.py",
          "views/whatif.py", "views/budget.py", "views/inbox.py", "views/help.py", "views/terms.py"]
 
 
@@ -33,6 +33,7 @@ def _text(at) -> str:
 def _forecast_app():
     at = _new_app()
     at.run()
+    at.switch_page("views/forecast.py").run()
     return at
 
 
@@ -71,14 +72,14 @@ def test_terms_gate_blocks_until_accepted():
     at.run()
     assert not at.exception
     assert any("Terms" in h.proto.body for h in at.get("html"))
-    assert "fc_mode" not in at.session_state  # the forecast page did not run
+    assert "home_pid" not in at.session_state  # the home page did not run
     continue_btn = next(b for b in at.button if b.label == "Continue to Demandino")
     assert continue_btn.disabled
     at.checkbox(key="terms_checkbox").check().run()
     next(b for b in at.button if b.label == "Continue to Demandino").click().run()
     assert not at.exception
     assert at.session_state["terms_accepted"] == TERMS_VERSION
-    assert "fc_mode" in at.session_state
+    assert "home_pid" in at.session_state
 
 
 def test_advisor_uses_forecast_page_product():
@@ -96,7 +97,8 @@ def test_theme_toggle_emits_switch_script():
 
 
 SIGNED_IN_PAGES = ["views/workspace.py", "views/connections.py", "views/orders.py", "views/tracking.py",
-                   "views/hierarchy.py", "views/assistant.py", "views/targets.py", "views/inbox.py"]
+                   "views/hierarchy.py", "views/assistant.py", "views/targets.py", "views/inbox.py",
+                   "views/home.py", "views/history.py"]
 
 
 @pytest.mark.parametrize("page", SIGNED_IN_PAGES)
@@ -168,7 +170,7 @@ def test_tracking_an_adjusted_forecast_keeps_the_model_version():
     at.session_state["load_scenario"] = ForecastInputs(
         False, "P001", "Earbuds", "Electronics", 250.0, 140.0, 30, start,
         events=(("Campaign", (start + pd.Timedelta(days=3)).date(), (start + pd.Timedelta(days=9)).date(), 50.0),))
-    at.run()
+    at.switch_page("views/forecast.py").run()
     next(b for b in at.button if b.label == "Track this forecast").click().run()
     assert not at.exception, at.exception
     p = db.list_forecasts(uid)[0]["payload"]
