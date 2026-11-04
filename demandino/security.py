@@ -80,9 +80,19 @@ def safe_csv(df: pd.DataFrame) -> str:
 
 
 # ------------------------------------------------------------ signed cache
+def private_dir(path: Path) -> Path:
+    """Create a folder only this account can read, tightening it if it already exists."""
+    path.mkdir(parents=True, exist_ok=True)
+    try:
+        os.chmod(path, 0o700)
+    except OSError:
+        pass
+    return path
+
+
 def _key(cache_dir: Path) -> bytes:
     """Per-installation secret used to sign cache files (created on first use, owner-only)."""
-    cache_dir.mkdir(exist_ok=True)
+    private_dir(cache_dir)
     path = cache_dir / ".signing-key"
     if not path.exists():
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)

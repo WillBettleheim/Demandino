@@ -34,9 +34,17 @@ CACHE_DIR = ROOT / ".cache"
 REAL_DATA = ROOT / "data" / "uci_online_retail_daily.csv"
 
 
+def _remove_stale_cache() -> None:
+    """Delete cache files from older model versions, and any made with user data before that was disallowed."""
+    for path in CACHE_DIR.glob("*.pkl"):
+        if not path.stem.endswith(f"-v{MODEL_VERSION}") or "-drv" in path.stem:
+            path.unlink(missing_ok=True)
+
+
 def _disk_cached(name: str, data_key: str, build: Callable[[], object]) -> object:
-    if data_key.startswith(("upload-", "ws-")):
-        return build()  # models of user data stay in memory only
+    if data_key.startswith(("upload-", "ws-")) or "-drv" in data_key:
+        return build()  # models of user data (including uploaded outside factors) stay in memory only
+    _remove_stale_cache()
     path = CACHE_DIR / f"{name}-{data_key}-v{MODEL_VERSION}.pkl"
     if path.exists():
         try:
