@@ -6,6 +6,10 @@ where it's handled. Nothing new is calculated here — it reads the same plan, a
 from __future__ import annotations
 
 import pandas as pd
+import streamlit as st
+
+from . import db, lifecycle, lostsales, targets
+from .planning import default_stock, portfolio_plan
 
 PRIORITY = {"now": 0, "week": 1, "info": 2}
 
@@ -52,3 +56,23 @@ def collect(plan: pd.DataFrame, drift: pd.DataFrame, stages: dict[str, str], los
             out.append(item("info", "Target at risk", f"{t['label']} ({t['start']} → {t['end']}): only "
                             f"{t['chance']:.0%} chance of making it.", "views/targets.py"))
     return sorted(out, key=lambda i: PRIORITY[i["priority"]])
+
+
+@st.cache_data(show_spinner="Gathering everything that needs attention…", max_entries=8)
+def _plan(data_key: str, stock: pd.DataFrame, _fc, level_uncertainty: float) -> pd.DataFrame:
+    return portfolio_plan(_fc, level_uncertainty, stock, 30, 14, 0.95)[0]
+
+
+def gather(app, currency: str = "") -> list[dict]:
+    """Everything needing attention for the active dataset (used by the Home and Inbox pages)."""
+    saved = db.get_setting(app.user_id, f"stock:{app.data_key}") if app.user_id else None
+    stock = st.session_state.get(f"pl_stock_{app.data_key}")
+    stock = stock if stock is not None else (pd.DataFrame(saved) if saved else default_stock(app.sales))
+    plan = _plan(app.data_key, stock, app.fc, app.level_uncertainty)
+    stages = lifecycle.stages(app.sales).set_index("product_id")["stage"].astype(str).to_dict()
+    lost = lostsales.window(lostsales.daily(app.fc.sales), app.fc.sales["date"].max(), 14)
+    saved_targets = []
+    for t in (db.get_setting(app.user_id, f"targets:{app.base_key}", []) if app.user_id else []):
+        p = targets.progress(app.fc, t["products"], pd.Timestamp(t["start"]), pd.Timestamp(t["end"]), t["metric"])
+        saved_targets.append({**t, "chance": targets.chance(p, t["target"])})
+    return collect(plan, app.drift()[0], stages, lost, saved_targets, currency)

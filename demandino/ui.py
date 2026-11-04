@@ -1,4 +1,4 @@
-"""Shared look & feel: the "Lagoon" theme (light + dark), glass cards, hero blocks, formatting and charts."""
+"""Shared look & feel: the "Harbor" theme (light + dark), glass cards, hero blocks, formatting and charts."""
 from __future__ import annotations
 
 import html
@@ -12,17 +12,18 @@ import streamlit as st
 from .model import RANGE_LABEL, ForecastResult
 
 # Mid-tone colours that read well on both the dark and the light background.
-BRAND = "#14B8A6"   # teal
-HIST = "#7C8B9A"    # slate
-FC = "#F97350"      # coral: the forecast
-BAND = "rgba(249,115,80,0.16)"
-PROMO = "#EC4899"
-GOOD = "#22C55E"
-BAD = "#EF4444"
-WARN = "#F59E0B"
-LAST_YEAR = "#3B82F6"
-PALETTE = ["#14B8A6", "#F97350", "#3B82F6", "#F59E0B", "#EC4899", "#8B5CF6", "#22C55E", "#64748B"]
-SEQ = [[0, "rgba(20,184,166,0.06)"], [0.5, "#14B8A6"], [1, "#F97350"]]  # heatmaps
+BRAND = "#16A095"   # teal: secondary series
+HIST = "#7A8797"    # slate: history and context
+FC = "#2F86E0"      # azure: the forecast
+BAND = "rgba(47,134,224,0.18)"
+PROMO = "#D9547F"
+GOOD = "#22A55B"    # status colours are reserved for state, never for a series
+BAD = "#E0484B"
+WARN = "#E39A1F"
+LAST_YEAR = "#BE8A1E"
+# Fixed hue order, checked for colour-blind separation on both the light and the dark surface.
+PALETTE = ["#2F86E0", "#D4702B", "#16A095", "#BE8A1E", "#D9547F", "#6C9A30"]
+SEQ = [[0, "rgba(47,134,224,0.05)"], [1, "#2F86E0"]]  # heatmaps: one hue, light to dark
 
 PAGE_PATHS = ["/", "/planning", "/advisor", "/budget", "/targets", "/whatif", "/alerts", "/changes", "/clearance",
               "/explore", "/overview", "/hierarchy", "/lifecycle", "/together", "/lostsales", "/assistant",
@@ -32,32 +33,28 @@ PAGE_PATHS = ["/", "/planning", "/advisor", "/budget", "/targets", "/whatif", "/
 CSS = """
 <style>
 :root, html[data-dm="dark"] {
-  --a: #2DD4BF; --b: #FF7A59; --c: #60A5FA;
-  --ink: #E6F1F5; --ink-2: rgba(230,241,245,.72);
+  --a: #5CA8F5; --b: #F0B35A; --c: #5AA9EA;
+  --ink: #E8EEF4; --ink-2: rgba(232,238,244,.70);
   --glass: rgba(255,255,255,0.035); --glass-2: rgba(255,255,255,0.06);
-  --edge: rgba(45,212,191,0.20); --edge-hi: rgba(45,212,191,0.42);
-  --glow: 0 0 0 1px rgba(45,212,191,0.08), 0 22px 60px -30px rgba(45,212,191,0.55);
-  --hero-bg: linear-gradient(135deg, rgba(45,212,191,0.16), rgba(255,122,89,0.08) 55%, rgba(96,165,250,0.07));
-  --title: linear-gradient(90deg, #FFFFFF 5%, #A7F3E9 55%, #FFC2B0);
-  --big: linear-gradient(90deg, #CCFBF1, #2DD4BF 40%, #FF7A59);
-  --aurora-1: rgba(45,212,191,0.16); --aurora-2: rgba(255,122,89,0.11); --aurora-3: rgba(96,165,250,0.08);
-  --tab-on: linear-gradient(135deg, rgba(45,212,191,.26), rgba(255,122,89,.14));
-  --chip-good: #4ADE80; --chip-warn: #FBBF24; --chip-bad: #F87171; --chip-acc: #5EEAD4;
-  --bar: rgba(7,11,16,0.72);
+  --edge: rgba(92,168,245,0.18); --edge-hi: rgba(92,168,245,0.40);
+  --glow: 0 18px 44px -32px rgba(0,0,0,0.9);
+  --hero-bg: linear-gradient(135deg, rgba(92,168,245,0.13), rgba(240,179,90,0.05) 70%);
+  --aurora-1: rgba(47,134,224,0.13); --aurora-2: rgba(240,179,90,0.06); --aurora-3: rgba(92,168,245,0.05);
+  --tab-on: rgba(92,168,245,.20);
+  --chip-good: #5FD38A; --chip-warn: #F0B35A; --chip-bad: #F58A8A; --chip-acc: #9CCBFA;
+  --bar: rgba(14,21,32,0.76);
 }
 html[data-dm="light"] {
-  --a: #0D9488; --b: #EA580C; --c: #2563EB;
-  --ink: #0B1F2A; --ink-2: rgba(11,31,42,.70);
-  --glass: rgba(255,255,255,0.78); --glass-2: rgba(255,255,255,0.95);
-  --edge: rgba(13,148,136,0.18); --edge-hi: rgba(13,148,136,0.40);
-  --glow: 0 1px 2px rgba(11,31,42,0.05), 0 16px 40px -24px rgba(13,148,136,0.35);
-  --hero-bg: linear-gradient(135deg, rgba(45,212,191,0.20), rgba(255,122,89,0.10) 55%, rgba(96,165,250,0.10));
-  --title: linear-gradient(90deg, #0B1F2A 10%, #0F766E 60%, #C2410C);
-  --big: linear-gradient(90deg, #0F766E, #0D9488 40%, #EA580C);
-  --aurora-1: rgba(45,212,191,0.18); --aurora-2: rgba(255,122,89,0.10); --aurora-3: rgba(96,165,250,0.10);
-  --tab-on: linear-gradient(135deg, rgba(45,212,191,.22), rgba(255,122,89,.12));
-  --chip-good: #15803D; --chip-warn: #B45309; --chip-bad: #B91C1C; --chip-acc: #0F766E;
-  --bar: rgba(244,250,250,0.78);
+  --a: #1D6FCF; --b: #B26A0B; --c: #2472BD;
+  --ink: #14202E; --ink-2: rgba(20,32,46,.70);
+  --glass: rgba(255,255,255,0.82); --glass-2: rgba(255,255,255,0.97);
+  --edge: rgba(29,111,207,0.15); --edge-hi: rgba(29,111,207,0.36);
+  --glow: 0 1px 2px rgba(20,32,46,0.05), 0 14px 34px -26px rgba(29,111,207,0.35);
+  --hero-bg: linear-gradient(135deg, rgba(29,111,207,0.10), rgba(240,179,90,0.08) 70%);
+  --aurora-1: rgba(47,134,224,0.11); --aurora-2: rgba(240,179,90,0.08); --aurora-3: rgba(92,168,245,0.07);
+  --tab-on: rgba(29,111,207,.13);
+  --chip-good: #15803D; --chip-warn: #B26A0B; --chip-bad: #B91C1C; --chip-acc: #1D6FCF;
+  --bar: rgba(246,248,250,0.82);
 }
 
 /* Aurora backdrop (static: animating a full-screen layer causes repaint glitches in some browsers). */
@@ -92,8 +89,7 @@ h1, h2, h3, h4, h5 {letter-spacing: -0.02em;}
 .dm-eyebrow {font-size: .72rem; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--a);
   margin-bottom: .35rem; position: relative;}
 .dm-hero h1 {font-family: "Space Grotesk", Inter, sans-serif; font-size: 2.3rem; font-weight: 700; margin: 0; padding: 0;
-  line-height: 1.12; background: var(--title); -webkit-background-clip: text; background-clip: text; color: transparent;
-  position: relative;}
+  line-height: 1.12; color: var(--ink); position: relative;}
 .dm-hero p {margin: .55rem 0 0; color: var(--ink-2); font-size: 1rem; max-width: 62rem; position: relative;}
 
 /* Spotlight: the headline number */
@@ -103,7 +99,7 @@ h1, h2, h3, h4, h5 {letter-spacing: -0.02em;}
               radial-gradient(120% 140% at 100% 100%, var(--aurora-2), transparent 60%), var(--glass);}
 .dm-spot .dm-big {font-family: "Space Grotesk", Inter, sans-serif; font-size: 3.5rem; font-weight: 700; line-height: 1.05;
   letter-spacing: -0.035em; animation: dm-pop .7s cubic-bezier(.2,.8,.2,1) both; font-variant-numeric: tabular-nums;}
-.dm-spot .dm-big span {background: var(--big); -webkit-background-clip: text; background-clip: text; color: transparent;}
+.dm-spot .dm-big span {color: var(--ink);}
 .dm-spot .dm-big small {font-size: 1.05rem; font-weight: 600; letter-spacing: 0; color: var(--ink-2); margin-left: .5rem;}
 @keyframes dm-pop { from {opacity: 0; transform: scale(.97) translateY(6px);} to {opacity: 1; transform: none;} }
 .dm-spot .dm-line {margin-top: .7rem; color: var(--ink-2); font-size: .96rem;}
@@ -114,7 +110,7 @@ h1, h2, h3, h4, h5 {letter-spacing: -0.02em;}
 .dm-chip.good {color: var(--chip-good); border-color: rgba(34,197,94,.35); background: rgba(34,197,94,.08);}
 .dm-chip.warn {color: var(--chip-warn); border-color: rgba(245,158,11,.38); background: rgba(245,158,11,.08);}
 .dm-chip.bad {color: var(--chip-bad); border-color: rgba(239,68,68,.38); background: rgba(239,68,68,.08);}
-.dm-chip.violet, .dm-chip.acc {color: var(--chip-acc); border-color: var(--edge-hi); background: rgba(45,212,191,.09);}
+.dm-chip.violet, .dm-chip.acc {color: var(--chip-acc); border-color: var(--edge-hi); background: rgba(47,134,224,.10);}
 
 /* Glass cards (st.container keyed "card-…") and metrics */
 [class*="st-key-card-"] {background: var(--glass) !important; border: 1px solid var(--edge) !important;
@@ -137,8 +133,8 @@ div[data-testid="stMetricValue"] {font-family: "Space Grotesk", Inter, sans-seri
 .stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] {display: none;}
 
 /* Buttons */
-[data-testid="stBaseButton-primary"] {background: linear-gradient(135deg, #14B8A6, #F97350) !important;
-  border: none !important; color: #fff !important; box-shadow: 0 10px 30px -14px rgba(249,115,80,.8);
+[data-testid="stBaseButton-primary"] {background: #1F6FD6 !important;
+  border: none !important; color: #fff !important; box-shadow: 0 10px 26px -16px rgba(31,111,214,.9);
   transition: transform .15s ease, filter .15s ease;}
 [data-testid="stBaseButton-primary"]:hover {transform: translateY(-1px); filter: brightness(1.06);}
 [data-testid="stBaseButton-primary"]:disabled {opacity: .4; filter: grayscale(.5); transform: none; box-shadow: none;
@@ -150,10 +146,9 @@ div[data-testid="stMetricValue"] {font-family: "Space Grotesk", Inter, sans-seri
 .dm-brand {font-family: "Space Grotesk", Inter, sans-serif; font-weight: 700; font-size: 1.5rem; letter-spacing: -0.03em;
   display: flex; align-items: center; gap: .5rem;}
 .dm-brand i {width: 1.35rem; height: 1.35rem; border-radius: .45rem; display: inline-block;
-  background: conic-gradient(from 200deg, #14B8A6, #3B82F6, #F97350, #14B8A6); box-shadow: 0 0 18px rgba(45,212,191,.5);}
+  background: conic-gradient(from 200deg, #2F86E0, #16A095, #F0B35A, #2F86E0); box-shadow: 0 0 14px rgba(47,134,224,.4);}
 .dm-brand b {font-weight: 700;}
-.dm-brand span {background: linear-gradient(90deg, #14B8A6, #F97350); -webkit-background-clip: text;
-  background-clip: text; color: transparent;}
+.dm-brand span {color: var(--a);}
 .dm-sub {color: var(--ink-2); font-size: .8rem; margin-top: -.1rem;}
 
 /* Findings grid */
@@ -177,7 +172,7 @@ div[data-testid="stMetricValue"] {font-family: "Space Grotesk", Inter, sans-seri
 .dm-step {display: flex; gap: .7rem; align-items: flex-start; padding: .75rem .85rem; border-radius: .9rem;
   background: var(--glass); border: 1px solid var(--edge);}
 .dm-step > span {flex: none; width: 1.75rem; height: 1.75rem; border-radius: 50%; display: grid; place-items: center;
-  font-weight: 700; color: #fff; background: linear-gradient(135deg, #14B8A6, #F97350);}
+  font-weight: 700; color: #fff; background: #1F6FD6;}
 .dm-step b {color: var(--ink);} .dm-step p {margin: .15rem 0 0; font-size: .86rem; color: var(--ink-2); line-height: 1.4;}
 
 /* "In short": the forecast as plain sentences with the next action */
@@ -418,9 +413,9 @@ def style(fig: go.Figure, title: str | None = None, height: int = 360, legend: b
         title=dict(text=title, font=dict(size=15, family="Space Grotesk, Inter, sans-serif")) if title else None,
         height=height, margin=dict(l=8, r=8, t=48 if title else 12, b=8), hovermode=hover, colorway=PALETTE,
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(family="Inter, sans-serif"),
-        hoverlabel=dict(bgcolor="rgba(255,255,255,0.96)" if light else "rgba(7,17,27,0.94)",
-                        bordercolor="rgba(13,148,136,0.45)",
-                        font=dict(color="#0B1F2A" if light else "#E6F1F5", family="Inter, sans-serif")),
+        hoverlabel=dict(bgcolor="rgba(255,255,255,0.96)" if light else "rgba(14,21,32,0.95)",
+                        bordercolor="rgba(47,134,224,0.45)",
+                        font=dict(color="#14202E" if light else "#E8EEF4", family="Inter, sans-serif")),
         showlegend=legend, legend=dict(orientation="h", yanchor="bottom", y=1.0, xanchor="right", x=1,
                                        font=dict(size=11), bgcolor="rgba(0,0,0,0)"),
         **layout,
@@ -468,8 +463,8 @@ def forecast_chart(res: ForecastResult, history: pd.DataFrame | None, title: str
         fig.add_scatter(x=res.dates[promo], y=res.mean[promo], mode="markers", name="Promo day",
                         marker=dict(color=PROMO, size=8, symbol="star", line=dict(width=0)), hoverinfo="skip")
     if history is not None and len(history):
-        fig.add_vrect(x0=res.dates[0], x1=res.dates[-1], fillcolor="rgba(20,184,166,0.05)", line_width=0)
-        fig.add_vline(x=res.dates[0], line_dash="dot", line_color="rgba(20,184,166,0.7)")
+        fig.add_vrect(x0=res.dates[0], x1=res.dates[-1], fillcolor="rgba(47,134,224,0.05)", line_width=0)
+        fig.add_vline(x=res.dates[0], line_dash="dot", line_color="rgba(47,134,224,0.7)")
         fig.add_annotation(x=res.dates[0], y=1, yref="paper", text="FORECAST →", showarrow=False, xanchor="left",
                            font=dict(size=10, color=BRAND), xshift=6)
     style(fig, title, height=height)
@@ -492,7 +487,7 @@ def polar_index(labels: list[str], values: np.ndarray, title: str, height: int =
     """A radar of an index around 100 (e.g. demand by month), filled like a glow."""
     v = (np.nan_to_num(np.asarray(values, dtype=float), nan=1.0)) * 100
     fig = go.Figure(go.Scatterpolar(r=list(v) + [v[0]], theta=list(labels) + [labels[0]], fill="toself",
-                                    fillcolor="rgba(20,184,166,0.18)", line=dict(color=BRAND, width=2.5),
+                                    fillcolor="rgba(47,134,224,0.18)", line=dict(color=BRAND, width=2.5),
                                     hovertemplate="%{theta}: %{r:.0f}<extra></extra>"))
     fig.add_trace(go.Scatterpolar(r=[100] * (len(labels) + 1), theta=list(labels) + [labels[0]], mode="lines",
                                   line=dict(color=HIST, dash="dot", width=1), hoverinfo="skip", showlegend=False))

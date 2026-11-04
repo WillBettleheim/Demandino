@@ -558,3 +558,18 @@ def test_inbox_orders_items_by_urgency():
     assert "End-of-life products on order" in titles and "Stock about to expire" in titles
     assert titles[-1] in ("Recent stock-outs", "Target at risk") and "$120" in " ".join(i["text"] for i in items)
     assert inbox.collect(plan.assign(status="Healthy", expiring_units=0), drift.iloc[:0], {}, lost.iloc[:0], []) == []
+
+
+# ---------------------------------------------------------- change history
+def test_change_history_records_edits_but_not_preferences():
+    uid = db.create_user("history_test", "a very long password")
+    db.set_setting(uid, "currency", "$")
+    assert db.list_activity(uid) == []
+    db.set_setting(uid, "stock:sample", {"stock": [1]})
+    po = db.create_po(uid, [{"product_id": "P001"}])
+    db.decide_po(uid, po, "Approved", "Sam")
+    got = db.list_activity(uid)
+    assert [g["kind"] for g in got] == ["Purchase orders", "Purchase orders", "Stock"]
+    assert "approved by Sam" in got[0]["detail"]
+    other = db.create_user("history_other", "a very long password")
+    assert db.list_activity(other) == []  # private to each account
