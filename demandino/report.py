@@ -58,3 +58,25 @@ def scenario_workbook(r: ScenarioResult, currency: str = "$") -> bytes:
                 width = max(len(str(c.value)) if c.value is not None else 0 for c in col)
                 ws.column_dimensions[col[0].column_letter].width = min(max(12, width + 2), 110)
     return buf.getvalue()
+
+
+def shop_workbook(summary: list[tuple[str, object]], attention: list[dict], stages: pd.DataFrame,
+                  lost: pd.DataFrame) -> bytes:
+    """One Excel file with the state of the whole shop, to read or forward (all text made formula-safe)."""
+    sheets = {
+        "Summary": pd.DataFrame(summary, columns=["Item", "Value"]),
+        "Needs attention": pd.DataFrame([{"Priority": {"now": "Act now", "week": "This week", "info": "For information"}[
+            i["priority"]], "What": i["title"], "Detail": i["text"]} for i in attention],
+            columns=["Priority", "What", "Detail"]),
+        "Life stages": stages[["product_name", "category", "stage", "recent_daily", "growth", "advice"]].assign(
+            stage=lambda d: d["stage"].astype(str)),
+        "Lost sales": lost,
+    }
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as xl:
+        for name, df in sheets.items():
+            sanitize_export(df).round(2).to_excel(xl, sheet_name=name, index=False)
+            for col in xl.sheets[name].columns:
+                width = max(len(str(c.value)) if c.value is not None else 0 for c in col)
+                xl.sheets[name].column_dimensions[col[0].column_letter].width = min(width + 2, 70)
+    return buf.getvalue()

@@ -3,7 +3,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from demandino import guide, inbox, ui
+from demandino import guide, inbox, lifecycle, lostsales, ui
+from demandino.report import shop_workbook
 from demandino.state import app
 
 A = app()
@@ -75,8 +76,7 @@ with c2:
         st.success("Nothing needs attention right now.", icon=":material/check_circle:")
     icons = {"now": ":material/priority_high:", "week": ":material/schedule:", "info": ":material/info:"}
     for i in items[:4]:
-        st.markdown(f"{icons[i['priority']]} **{i['title']}**  \n<small>{i['text']}</small>".replace("$", "\\$"),
-                    unsafe_allow_html=True)
+        st.markdown(f"{icons[i['priority']]} **{i['title']}**  \n{ui.md_safe(i['text'])}")
     st.page_link("views/inbox.py", label=f"See all {len(items)} in the Inbox", icon=":material/inbox:")
 
 c1, c2 = st.columns([1, 1.7])
@@ -92,6 +92,15 @@ with c1:
     st.page_link("views/targets.py", label="Check a sales target", icon=":material/flag:")
     st.page_link("views/whatif.py", label="Try a price change or sale", icon=":material/science:")
     st.page_link("views/help.py", label="Help & glossary", icon=":material/menu_book:")
+    summary = [("Sales up to", f"{last:%d %b %Y}"), ("Sales, last 30 days", round(rev_now)),
+               ("Units, last 30 days", int(recent["units_sold"].sum())),
+               ("Forecast units, next 30 days", round(next30["units"].sum())),
+               ("Forecast sales, next 30 days", round(next30["revenue"].sum())), ("Items needing attention", len(items))]
+    report = shop_workbook(summary, items, lifecycle.stages(s),
+                           lostsales.by_product(lostsales.window(lostsales.daily(A.fc.sales), last, 90)))
+    st.download_button("Download shop report (Excel)", report, f"demandino_report_{last:%Y-%m-%d}.xlsx",
+                       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                       icon=":material/summarize:", key="home_report")
 top = (recent.assign(revenue=recent["units_sold"] * recent["price"]).groupby("product_name")["revenue"].sum()
        .nlargest(8).iloc[::-1])
 fig = go.Figure(go.Bar(x=top.values, y=top.index, orientation="h", marker_color=ui.FC, marker_line_width=0,
