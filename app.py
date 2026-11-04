@@ -26,40 +26,47 @@ with st.sidebar:
 legal.sync_cookie()
 account.sync_cookie()
 
+page = st.Page
 pages = {
+    "": [page("views/home.py", title="Home", icon=":material/home:", default=True),
+         page("views/inbox.py", title="Inbox", icon=":material/inbox:")],
     "Forecast": [
-        st.Page("views/forecast.py", title="Forecast a product", icon=":material/online_prediction:", default=True),
-        st.Page("views/planning.py", title="Demand planning", icon=":material/inventory:"),
-        st.Page("views/advisor.py", title="Grow demand", icon=":material/rocket_launch:"),
-        st.Page("views/budget.py", title="Buying budget", icon=":material/account_balance_wallet:"),
-        st.Page("views/targets.py", title="Sales targets", icon=":material/flag:"),
-        st.Page("views/whatif.py", title="Store what-if", icon=":material/science:"),
-        st.Page("views/alerts.py", title="Demand alerts", icon=":material/notifications_active:"),
-        st.Page("views/changes.py", title="What changed", icon=":material/difference:"),
-        st.Page("views/clearance.py", title="Clear slow stock", icon=":material/sell:"),
+        page("views/forecast.py", title="Forecast a product", icon=":material/online_prediction:", url_path="forecast"),
+        page("views/changes.py", title="What changed", icon=":material/difference:"),
+        page("views/alerts.py", title="Demand alerts", icon=":material/notifications_active:"),
+        page("views/accuracy.py", title="Model accuracy", icon=":material/fact_check:"),
+        page("views/tracking.py", title="Forecast tracking", icon=":material/track_changes:"),
+    ],
+    "Plan": [
+        page("views/planning.py", title="Demand planning", icon=":material/inventory:"),
+        page("views/budget.py", title="Buying budget", icon=":material/account_balance_wallet:"),
+        page("views/orders.py", title="Purchase orders", icon=":material/receipt_long:"),
+        page("views/clearance.py", title="Clear slow stock", icon=":material/sell:"),
+    ],
+    "Grow": [
+        page("views/advisor.py", title="Grow demand", icon=":material/rocket_launch:"),
+        page("views/targets.py", title="Sales targets", icon=":material/flag:"),
+        page("views/whatif.py", title="Store what-if", icon=":material/science:"),
+        page("views/together.py", title="Bought together", icon=":material/shopping_basket:"),
     ],
     "Analyze": [
-        st.Page("views/explore.py", title="Explore sales patterns", icon=":material/query_stats:"),
-        st.Page("views/overview.py", title="Portfolio overview", icon=":material/dashboard:"),
-        st.Page("views/hierarchy.py", title="Store & category totals", icon=":material/account_tree:"),
-        st.Page("views/lifecycle.py", title="Product life stages", icon=":material/timeline:"),
-        st.Page("views/together.py", title="Bought together", icon=":material/shopping_basket:"),
-        st.Page("views/lostsales.py", title="Lost sales", icon=":material/money_off:"),
-        st.Page("views/assistant.py", title="Ask Demandino", icon=":material/auto_awesome:"),
+        page("views/explore.py", title="Explore sales patterns", icon=":material/query_stats:"),
+        page("views/overview.py", title="Portfolio overview", icon=":material/dashboard:"),
+        page("views/hierarchy.py", title="Store & category totals", icon=":material/account_tree:"),
+        page("views/lifecycle.py", title="Product life stages", icon=":material/timeline:"),
+        page("views/lostsales.py", title="Lost sales", icon=":material/money_off:"),
+        page("views/assistant.py", title="Ask Demandino", icon=":material/auto_awesome:"),
     ],
-    "Workspace": [
-        st.Page("views/inbox.py", title="Inbox", icon=":material/inbox:"),
-        st.Page("views/workspace.py", title="Workspace", icon=":material/folder_shared:"),
-        st.Page("views/datacheck.py", title="Data check", icon=":material/rule:"),
-        st.Page("views/connections.py", title="Connections & alerts", icon=":material/hub:"),
-        st.Page("views/orders.py", title="Purchase orders", icon=":material/receipt_long:"),
+    "Settings": [
+        page("views/workspace.py", title="Workspace", icon=":material/folder_shared:"),
+        page("views/datacheck.py", title="Data check", icon=":material/rule:"),
+        page("views/connections.py", title="Connections & alerts", icon=":material/hub:"),
+        page("views/history.py", title="Change history", icon=":material/history:"),
+        page("views/help.py", title="Help & glossary", icon=":material/menu_book:"),
+        page("views/terms.py", title="Terms & conditions", icon=":material/gavel:"),
     ],
-    "Model": [st.Page("views/accuracy.py", title="Model accuracy", icon=":material/fact_check:"),
-              st.Page("views/tracking.py", title="Forecast tracking", icon=":material/track_changes:")],
-    "About": [st.Page("views/help.py", title="Help & glossary", icon=":material/menu_book:"),
-              st.Page("views/terms.py", title="Terms & conditions", icon=":material/gavel:")],
 }
-nav = st.navigation(pages)
+nav = st.navigation(pages, position="top")
 
 if not legal.gate():
     st.stop()
