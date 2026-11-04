@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import html
 import json
+import re
 
 import numpy as np
 import pandas as pd
@@ -25,10 +26,10 @@ LAST_YEAR = "#BE8A1E"
 PALETTE = ["#2F86E0", "#D4702B", "#16A095", "#BE8A1E", "#D9547F", "#6C9A30"]
 SEQ = [[0, "rgba(47,134,224,0.05)"], [1, "#2F86E0"]]  # heatmaps: one hue, light to dark
 
-PAGE_PATHS = ["/", "/planning", "/advisor", "/budget", "/targets", "/whatif", "/alerts", "/changes", "/clearance",
-              "/explore", "/overview", "/hierarchy", "/lifecycle", "/together", "/lostsales", "/assistant",
-              "/inbox", "/workspace", "/datacheck", "/connections", "/orders", "/accuracy", "/tracking", "/help",
-              "/terms"]
+PAGE_PATHS = ["/", "/forecast", "/planning", "/advisor", "/budget", "/targets", "/whatif", "/alerts", "/changes",
+              "/clearance", "/explore", "/overview", "/hierarchy", "/lifecycle", "/together", "/lostsales",
+              "/compare", "/assistant", "/inbox", "/workspace", "/datacheck", "/connections", "/security",
+              "/history", "/orders", "/accuracy", "/tracking", "/help", "/terms"]
 
 CSS = """
 <style>
@@ -345,6 +346,11 @@ def stat_strip(items: list[tuple[str, str]]) -> None:
     """A row of small headline stats: (label, value)."""
     cells = "".join(f'<div class="dm-stat"><span>{html.escape(k)}</span><b>{html.escape(v)}</b></div>' for k, v in items)
     st.html(f'<div class="dm-strip">{cells}</div>')
+
+
+def md_safe(text: object) -> str:
+    """Make text from files or users safe inside st.markdown: no links, images, icons, HTML or maths."""
+    return re.sub(r"([\\`*_{}\[\]()<>#!|~$:^=])", r"\\\1", str(text))
 
 
 def _md_bold(text: str) -> str:

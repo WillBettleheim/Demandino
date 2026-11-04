@@ -34,7 +34,7 @@ for r in flagged.head(12).itertuples():
     with ui.card(f"alert-{r.product_id}"):
         c1, c2 = st.columns([1.3, 1])
         icon = ":material/trending_up:" if r.direction == "Above" else ":material/trending_down:"
-        c1.markdown(f"**{icon} {r.product_name}** · {r.category}")
+        c1.markdown(f"**{icon} {ui.md_safe(r.product_name)}** · {ui.md_safe(r.category)}")
         c1.markdown(f"Sold **{ui.num(r.actual)}** vs **{ui.num(r.expected)}** expected "
                     f"(range {ui.num(r.low)}–{ui.num(r.high)}) · **{r.change:+.0%}** · outside the range "
                     f"{r.weeks_outside} of {r.weeks} weeks")

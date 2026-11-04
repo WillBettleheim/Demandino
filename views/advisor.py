@@ -32,7 +32,7 @@ with ui.card("adv-inputs"):
     c1, c2, c3, c4 = st.columns([2, 1, 1, 1])
     if src == "Product from the Forecast page":
         inp = last
-        c1.markdown(f"**{inp.name}** · {inp.category}  \n{ui.money(inp.price, 2)} · cost {ui.money(inp.cost, 2)} · "
+        c1.markdown(f"**{ui.md_safe(inp.name)}** · {ui.md_safe(inp.category)}  \n{ui.money(inp.price, 2)} · cost {ui.money(inp.cost, 2)} · "
                     f"{inp.horizon} days from {inp.start:%d %b %Y}")
         target = c2.number_input("Sales goal (units, optional)", 0, 10_000_000, 0, 10, key="adv_goal_fc") or None
     else:

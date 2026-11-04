@@ -71,8 +71,8 @@ else:
     for r in slow.head(10).itertuples():
         with ui.card(f"clear-{r.product_id}"):
             a, b = st.columns([1.6, 1])
-            a.markdown(f"**{r.product_name}** · {r.category}")
-            a.caption(clearance.advice(r._asdict(), ui.currency()).replace("$", "\\$"))
+            a.markdown(f"**{ui.md_safe(r.product_name)}** · {ui.md_safe(r.category)}")
+            a.caption(ui.md_safe(clearance.advice(r._asdict(), ui.currency())))
             b.html(f'<div class="dm-stat"><span>Suggested markdown</span><b>{r.discount:.0%} off → '
                    f'{html.escape(ui.money(r.new_price, 2))}</b><small>frees {html.escape(ui.money(r.cash_freed))} · '
                    f'saves {html.escape(ui.money(r.holding_cost_avoided))} holding</small></div>')

@@ -59,7 +59,7 @@ with t3:
         st.caption("Create share links from the Forecast page (Export tab). Links expire after 7 days.")
     for sh in shares:
         c1, c2 = st.columns([4, 1], vertical_alignment="center")
-        c1.markdown(f"**{sh['title']}** · expires {pd.Timestamp(sh['expires'], unit='s'):%d %b %Y}")
+        c1.markdown(f"**{ui.md_safe(sh['title'])}** · expires {pd.Timestamp(sh['expires'], unit='s'):%d %b %Y}")
         if c2.button("Revoke", key=f"rev_{sh['token_hash'][:12]}", icon=":material/link_off:", width="stretch"):
             db.revoke_share(uid, sh["token_hash"])
             st.rerun()

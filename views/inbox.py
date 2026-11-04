@@ -21,7 +21,7 @@ icons = {"now": ":material/priority_high:", "week": ":material/schedule:", "info
 for k, i in enumerate(items):
     with ui.card(f"inbox-{k}"):
         c1, c2 = st.columns([4, 1], vertical_alignment="center")
-        c1.markdown(f"**{icons[i['priority']]} {i['title']}**  \n{i['text']}".replace("$", "\\$"))
+        c1.markdown(f"**{icons[i['priority']]} {i['title']}**  \n{ui.md_safe(i['text'])}")
         c2.page_link(i["page"], label="Open", icon=":material/arrow_forward:")
 if not saved:
     st.caption("Ordering items use illustrative stock levels until you save your own on Demand planning.")
