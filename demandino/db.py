@@ -59,6 +59,9 @@ CREATE TABLE IF NOT EXISTS forecast_log (
 CREATE TABLE IF NOT EXISTS shares (
   token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL, created REAL NOT NULL, expires REAL NOT NULL,
   title TEXT NOT NULL, payload TEXT NOT NULL, FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE);
+CREATE TABLE IF NOT EXISTS activity (
+  id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, at REAL NOT NULL, kind TEXT NOT NULL, detail TEXT NOT NULL,
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE);
 CREATE TABLE IF NOT EXISTS purchase_orders (
   id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, created REAL NOT NULL, status TEXT NOT NULL, note TEXT NOT NULL,
   lines TEXT NOT NULL, decided_at REAL, decided_by TEXT, ordered_at REAL, received_at REAL,
@@ -252,6 +255,7 @@ def save_scenario(user_id: int, name: str, inputs: dict, summary: dict) -> None:
     with connect() as con:
         con.execute("INSERT INTO scenarios(user_id, name, created, inputs, summary) VALUES (?,?,?,?,?)",
                     (user_id, name[:80], time.time(), json.dumps(inputs), json.dumps(summary)))
+    log_activity(user_id, "Scenarios", f"Saved scenario: {name[:80]}")
 
 
 def list_scenarios(user_id: int) -> list[dict]:
@@ -266,10 +270,32 @@ def delete_scenario(user_id: int, scenario_id: int) -> None:
         con.execute("DELETE FROM scenarios WHERE id = ? AND user_id = ?", (scenario_id, user_id))
 
 
+# Settings worth recording in the change history (not preferences saved on every page view, like the currency).
+LOGGED_SETTINGS = {"stock:": ("Stock", "Stock table saved"), "targets:": ("Targets", "Sales targets updated"),
+                   "bulk:": ("Model", "One-off bulk order choices changed"),
+                   "weather:": ("Model", "Weather place changed"), "alerts": ("Alerts", "Alert settings saved")}
+
+
 def set_setting(user_id: int, key: str, value) -> None:
     with connect() as con:
         con.execute("INSERT INTO settings VALUES (?,?,?) ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value",
                     (user_id, key, json.dumps(value)))
+    for prefix, (kind, detail) in LOGGED_SETTINGS.items():
+        if key.startswith(prefix):
+            log_activity(user_id, kind, detail)
+
+
+def log_activity(user_id: int, kind: str, detail: str) -> None:
+    with connect() as con:
+        con.execute("INSERT INTO activity(user_id, at, kind, detail) VALUES (?,?,?,?)",
+                    (user_id, time.time(), kind[:30], detail[:300]))
+
+
+def list_activity(user_id: int, limit: int = 500) -> list[dict]:
+    with connect() as con:
+        rows = con.execute("SELECT at, kind, detail FROM activity WHERE user_id = ? ORDER BY at DESC, id DESC LIMIT ?",
+                           (user_id, limit)).fetchall()
+    return [dict(r) for r in rows]
 
 
 def get_setting(user_id: int, key: str, default=None):
@@ -358,7 +384,9 @@ def create_po(user_id: int, lines: list[dict], note: str = "") -> int:
     with connect() as con:
         cur = con.execute("INSERT INTO purchase_orders(user_id, created, status, note, lines) VALUES (?,?,?,?,?)",
                           (user_id, time.time(), "Draft", note[:300], json.dumps(lines, default=str)))
-        return int(cur.lastrowid)
+        po_id = int(cur.lastrowid)
+    log_activity(user_id, "Purchase orders", f"PO #{po_id} created ({len(lines)} lines)")
+    return po_id
 
 
 def list_pos(user_id: int) -> list[dict]:
@@ -377,6 +405,7 @@ def decide_po(user_id: int, po_id: int, status: str, by: str) -> None:
         if status == "Ordered":
             con.execute("UPDATE purchase_orders SET ordered_at = COALESCE(ordered_at, ?) WHERE id = ? AND user_id = ?",
                         (time.time(), po_id, user_id))
+    log_activity(user_id, "Purchase orders", f"PO #{po_id} {status.lower()}" + (f" by {by[:40]}" if by else ""))
 
 
 def receive_po(user_id: int, po_id: int, ordered_at: float, received_at: float, by: str) -> None:
@@ -387,3 +416,5 @@ def receive_po(user_id: int, po_id: int, ordered_at: float, received_at: float, 
         con.execute("UPDATE purchase_orders SET status = 'Received', ordered_at = ?, received_at = ?, decided_by = ? "
                     "WHERE id = ? AND user_id = ? AND status IN ('Approved', 'Ordered', 'Received')",
                     (ordered_at, received_at, by[:40], po_id, user_id))
+    log_activity(user_id, "Purchase orders", f"PO #{po_id} received after "
+                                             f"{round((received_at - ordered_at) / 86400)} days")
