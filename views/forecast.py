@@ -296,12 +296,11 @@ with right:
         ui.show(ui.style(fig, "Average by weekday", height=290, legend=False, hover="closest"), c1)
         fig = go.Figure()
         fig.add_scatter(x=res.dates, y=np.cumsum(res.mean), name="Cumulative forecast", line=dict(color=ui.FC),
-                        fill="tozeroy", fillcolor="rgba(249,115,80,0.12)", line_shape="spline")
-        fig.add_scatter(x=res.dates, y=np.cumsum(res.mean * res.price), name="Cumulative revenue", yaxis="y2",
-                        line=dict(color=ui.BRAND, dash="dot"), line_shape="spline")
+                        fill="tozeroy", fillcolor=ui.BAND, line_shape="spline",
+                        customdata=np.cumsum(res.mean * res.price),
+                        hovertemplate="%{y:,.0f} units · " + ui.currency() + "%{customdata:,.0f} revenue<extra></extra>")
         fig.add_hline(y=inputs.stock, line_dash="dash", line_color=ui.HIST, annotation_text="current stock")
-        ui.style(fig, "Cumulative units & revenue", height=290,
-                 yaxis2=dict(overlaying="y", side="right", showgrid=False, tickprefix=ui.currency(), rangemode="tozero"))
+        ui.style(fig, "Cumulative units vs your stock", height=290, legend=False)
         ui.show(fig, c2)
 
         c1, c2 = st.columns(2)
@@ -407,15 +406,14 @@ with right:
         best = sens.loc[sens["profit"].idxmax()]
         c1, c2 = st.columns(2)
         fig = go.Figure()
-        fig.add_scatter(x=sens["price"], y=sens["units"], name="Units", line=dict(color=ui.HIST))
-        fig.add_scatter(x=sens["price"], y=sens["profit"], name="Profit", yaxis="y2", line=dict(color=ui.GOOD, width=3))
-        fig.add_scatter(x=[best["price"]], y=[best["profit"]], yaxis="y2", mode="markers", name="Max profit",
-                        marker=dict(color=ui.GOOD, size=13, symbol="diamond"))
+        fig.add_scatter(x=sens["price"], y=sens["profit"], name="Profit", line=dict(color=ui.FC, width=3),
+                        customdata=sens["units"], hovertemplate="Profit %{y:,.0f} · %{customdata:,.0f} units<extra></extra>")
+        fig.add_scatter(x=[best["price"]], y=[best["profit"]], mode="markers", name="Max profit",
+                        marker=dict(color=ui.FC, size=13, symbol="diamond"), hoverinfo="skip")
         fig.add_vline(x=price, line_dash="dash", line_color="gray", annotation_text="your price")
-        ui.style(fig, f"Regular price what-if ({horizon}-day totals)", height=380,
-                 yaxis2=dict(title="Profit", overlaying="y", side="right", showgrid=False))
+        ui.style(fig, f"Regular price what-if ({horizon}-day profit)", height=380, hover="closest")
         fig.update_xaxes(title_text=f"Regular price ({ui.currency()})")
-        fig.update_yaxes(title_text="Units", selector=dict(overlaying=None))
+        fig.update_yaxes(title_text=f"Profit ({ui.currency()})")
         ui.show(fig, c1)
         c1.caption(f"Price elasticity {r.elasticity:.2f}: a 1% price rise changes units by {r.elasticity:.2f}%. "
                    "Far from today's price the estimate is less certain.")

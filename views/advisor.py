@@ -105,12 +105,13 @@ if len(grid):
 price = g["price"]
 if len(price):
     fig = go.Figure()
-    fig.add_scatter(x=price["price"], y=price["units"], name="Units", line=dict(color=ui.HIST), line_shape="spline")
-    ui.glow_line(fig, price["price"], price["profit"], ui.GOOD, "Profit", yaxis="y2")
-    fig.add_vline(x=inp.price, line_dash="dot", line_color="rgba(20,184,166,.8)", annotation_text="now")
-    ui.style(fig, "Price · units and profit", height=340,
-             yaxis2=dict(title="Profit", overlaying="y", side="right", showgrid=False))
+    fig.add_scatter(x=price["price"], y=price["profit"], name="Profit", line=dict(color=ui.FC, width=3),
+                    line_shape="spline", customdata=price["units"],
+                    hovertemplate="Profit %{y:,.0f} · %{customdata:,.0f} units<extra></extra>")
+    fig.add_vline(x=inp.price, line_dash="dot", line_color=ui.HIST, annotation_text="now")
+    ui.style(fig, "Price · profit (units in the tooltip)", height=340, legend=False, hover="closest")
     fig.update_xaxes(title_text=f"Regular price ({ui.currency()})")
+    fig.update_yaxes(title_text=f"Profit ({ui.currency()})")
     ui.show(fig, c2)
 
 timing = g["timing"]
