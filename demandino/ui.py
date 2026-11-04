@@ -26,7 +26,8 @@ SEQ = [[0, "rgba(20,184,166,0.06)"], [0.5, "#14B8A6"], [1, "#F97350"]]  # heatma
 
 PAGE_PATHS = ["/", "/planning", "/advisor", "/budget", "/targets", "/whatif", "/alerts", "/changes", "/clearance",
               "/explore", "/overview", "/hierarchy", "/lifecycle", "/together", "/lostsales", "/assistant",
-              "/workspace", "/datacheck", "/connections", "/orders", "/accuracy", "/tracking", "/help", "/terms"]
+              "/inbox", "/workspace", "/datacheck", "/connections", "/orders", "/accuracy", "/tracking", "/help",
+              "/terms"]
 
 CSS = """
 <style>

@@ -38,6 +38,9 @@ your own data, choose **Upload my CSV** in the sidebar. You can download a templ
   cover the forecast (with last year overlaid), a drivers waterfall, weekly and monthly breakdowns, price and
   promotion what-ifs, an inventory plan, sales patterns, saved scenarios compared side by side, and an Excel or
   CSV export.
+- **Inbox.** One list of everything needing attention — orders due now or this week, stock about to expire,
+  end-of-life products still on order, products drifting from their forecast, recent stock-outs and sales
+  targets at risk — most urgent first, each linking to the page that handles it.
 - **Demand planning.** Forecasts every product at once from an editable table of stock and lead times. Each
   product gets a status, a run-out date, an order-by date and an order quantity, and you can download a
   purchase list.
