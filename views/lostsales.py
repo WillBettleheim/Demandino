@@ -11,7 +11,7 @@ ui.page_header("Lost sales",
                "What empty shelves cost you: demand on days a product had run out, valued in money — by product, "
                "by month and by stock-out.", eyebrow="Analyze")
 
-saved = db.get_setting(A.user_id, f"stock:{A.data_key}") if A.user_id else None
+saved = db.get_setting(A.user_id, f"stock:{A.settings_key}") if A.user_id else None
 unit_cost = (pd.DataFrame(saved).groupby("product_id")["unit_cost"].mean().to_dict()
              if saved and "unit_cost" in pd.DataFrame(saved) else None)
 period = st.segmented_control("Period", ["Last 90 days", "Last year", "All history"], default="Last year",

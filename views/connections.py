@@ -133,14 +133,14 @@ with t5:
             db.set_secret(uid, "smtp_password", smtp_pw)
         st.toast("Alert settings saved.", icon=":material/check:")
 
-    stock = db.get_setting(uid, f"stock:{A.data_key}")
+    stock = db.get_setting(uid, f"stock:{A.settings_key}")
     stock = pd.DataFrame(stock) if stock else default_stock(A.sales)
     plan, _ = portfolio_plan(A.fc, A.level_uncertainty, stock, int(horizon), 14, 0.95)
     lines = ig.alert_lines(plan, int(so_days), float(change)) + monitor.drift_lines(A.drift()[0])
     digest = ig.digest_text(plan, int(horizon), ui.currency(), lines)
     st.markdown(f"##### Preview · {len(lines)} alerts for the current data")
     st.code(digest, language=None)
-    if not db.get_setting(uid, f"stock:{A.data_key}"):
+    if not db.get_setting(uid, f"stock:{A.settings_key}"):
         st.caption("Using illustrative stock levels — save your real ones on the Demand planning page.")
     b1, b2 = st.columns(2)
     if b1.button("Send to Slack now", icon=":material/send:", width="stretch"):

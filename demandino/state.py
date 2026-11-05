@@ -17,7 +17,7 @@ import pandas as pd
 import streamlit as st
 
 from .analysis import elasticities
-from . import account, db, monitor, quality, weather
+from . import account, catalog, db, monitor, quality, weather
 from .integrations import ConnectorError
 from .data import generate_sample_data, prepare_sales, template_csv
 from .model import MIN_CHECK_DAYS, MIN_TRAIN_DAYS, DemandForecaster, backtest
@@ -82,7 +82,7 @@ def _load_upload(content: bytes, choices: tuple = ()) -> tuple[pd.DataFrame, lis
     return sales, issues
 
 
-@st.cache_resource(show_spinner="Training the forecasting model on all products (first run only)…", max_entries=6,
+@st.cache_resource(show_spinner="Training the forecasting model on all products (this can take a minute)…", max_entries=6,
                    ttl=6 * 3600)
 def _model(data_key: str, _sales: pd.DataFrame, _country: str | None, _drivers: pd.DataFrame | None,
            _bulk: tuple[frozenset, frozenset] = (frozenset(), frozenset())) -> DemandForecaster:
@@ -91,7 +91,7 @@ def _model(data_key: str, _sales: pd.DataFrame, _country: str | None, _drivers: 
                                                  bulk_add=_bulk[1]).fit())
 
 
-@st.cache_resource(show_spinner="Back-testing the model on the last 90 days (first run only)…", max_entries=6,
+@st.cache_resource(show_spinner="Back-testing the model on the last 90 days (this can take a minute)…", max_entries=6,
                    ttl=6 * 3600)
 def _backtest(data_key: str, _sales: pd.DataFrame, _country: str | None, _drivers: pd.DataFrame | None,
               _bulk: tuple[frozenset, frozenset] = (frozenset(), frozenset())) -> dict:
@@ -120,6 +120,9 @@ class AppState:
     drivers: pd.DataFrame | None = None
     bulk: tuple[frozenset, frozenset] = (frozenset(), frozenset())  # (kept as real demand, marked one-off)
     base_key: str = ""  # data_key before bulk-order choices were applied
+    settings_key: str = ""  # data_key before product edits: saved stock survives a rename
+    catalog_id: str = ""  # which dataset product edits belong to (see catalog.py)
+    fx_rate: float = 1.0
 
     @property
     def fc(self) -> DemandForecaster:
@@ -263,7 +266,11 @@ def sidebar_data_source() -> AppState | None:
             end = (pd.Timestamp.today().normalize() - pd.Timedelta(days=1)).strftime("%Y-%m-%d")
             sales, key, default_country = _load_sample(end), f"sample-{end}", "US"
             st.caption("Simulated store: 30 products, 6 categories, 3 years of daily sales.")
+        edits = catalog.EMPTY
         if sales is not None:
+            st.session_state["_raw_sales"] = sales
+            edits = catalog.load(catalog.dataset_id(key))
+            sales = catalog.apply(sales, edits)
             st.caption(f"{sales['product_id'].nunique()} products · {sales['date'].min():%d %b %Y} → "
                        f"{sales['date'].max():%d %b %Y}")
 
@@ -315,8 +322,12 @@ def sidebar_data_source() -> AppState | None:
     keep, add = bulk_choices(base_key)
     if keep or add:
         full_key += "-blk" + hashlib.md5(repr((sorted(keep), sorted(add))).encode()).hexdigest()[:10]
+    settings_key = full_key
+    if catalog.has_edits(edits):
+        full_key += "-cat" + catalog.digest(edits)
     return AppState(sales=sales, data_key=full_key, source=source, country=country, drivers=drivers,
-                    bulk=(keep, add), base_key=base_key)
+                    bulk=(keep, add), base_key=base_key, settings_key=settings_key,
+                    catalog_id=catalog.dataset_id(key), fx_rate=rate)
 
 
 @st.cache_data(show_spinner="Fetching weather…", max_entries=8, ttl=6 * 3600)
@@ -386,6 +397,11 @@ def set_bulk_choices(base_key: str, keep: set, add: set) -> None:
 @st.cache_data(show_spinner=False, max_entries=4, ttl=3600)
 def _load_saved(uid: int, dataset_id: int, created: float) -> pd.DataFrame | None:
     return db.load_dataset(uid, dataset_id)
+
+
+def raw_sales() -> pd.DataFrame:
+    """The active dataset before product edits (see catalog.py)."""
+    return st.session_state["_raw_sales"]
 
 
 def app() -> AppState:

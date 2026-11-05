@@ -28,7 +28,7 @@ SEQ = [[0, "rgba(232,96,76,0.05)"], [1, "#E8604C"]]  # heatmaps: one hue, light 
 
 PAGE_PATHS = ["/", "/dashboard", "/forecast", "/planning", "/advisor", "/budget", "/targets", "/whatif", "/alerts", "/changes",
               "/clearance", "/explore", "/overview", "/hierarchy", "/lifecycle", "/together", "/lostsales",
-              "/compare", "/assistant", "/inbox", "/workspace", "/datacheck", "/connections", "/security",
+              "/compare", "/assistant", "/inbox", "/workspace", "/products", "/datacheck", "/connections", "/security",
               "/history", "/orders", "/accuracy", "/tracking", "/help", "/terms"]
 
 CSS = """

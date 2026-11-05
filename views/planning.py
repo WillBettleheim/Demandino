@@ -30,10 +30,10 @@ with ui.card("plan-controls"):
                              help="0 = no limit. With a budget, the most urgent orders are kept and the rest are "
                                   "marked Deferred.") or None
 
-stock_key = f"pl_stock_{A.data_key}"
+stock_key = f"pl_stock_{A.settings_key}"
 uid = A.user_id
 if stock_key not in st.session_state:
-    saved = db.get_setting(uid, f"stock:{A.data_key}") if uid else None
+    saved = db.get_setting(uid, f"stock:{A.settings_key}") if uid else None
     st.session_state[stock_key] = pd.DataFrame(saved) if saved else default_stock(A.sales)
 base = st.session_state[stock_key].copy()
 for col, default in (("shelf_life", 0), ("expires_in", 0), ("supplier", suppliers.DEFAULT_SUPPLIER)):
@@ -48,7 +48,7 @@ with st.expander("Stock, warehouses & ordering rules — edit to match your busi
     st.caption("Starting values are illustrative. Add a row per warehouse for products stocked in several places "
                "(their demand shares are split proportionally). MOQ = minimum order quantity; orders are rounded up to "
                "whole case packs.")
-    edited = st.data_editor(base, key=f"pl_editor_{A.data_key}", hide_index=True, width="stretch", num_rows="dynamic",
+    edited = st.data_editor(base, key=f"pl_editor_{A.settings_key}", hide_index=True, width="stretch", num_rows="dynamic",
                             disabled=["product_name", "category"],
                             column_config={
                                 "product_id": st.column_config.SelectboxColumn("Product", options=list(A.label_of),
@@ -83,10 +83,10 @@ with st.expander("Stock, warehouses & ordering rules — edit to match your busi
     b1, b2 = st.columns(2)
     if b1.button("Reset to illustrative values", icon=":material/restart_alt:"):
         st.session_state[stock_key] = default_stock(A.sales)
-        st.session_state.pop(f"pl_editor_{A.data_key}", None)
+        st.session_state.pop(f"pl_editor_{A.settings_key}", None)
         st.rerun()
     if uid and b2.button("Save stock table to my workspace", icon=":material/save:"):
-        db.set_setting(uid, f"stock:{A.data_key}", edited.to_dict(orient="list"))
+        db.set_setting(uid, f"stock:{A.settings_key}", edited.to_dict(orient="list"))
         st.toast("Stock table saved.", icon=":material/check:")
 
 if edited.empty:

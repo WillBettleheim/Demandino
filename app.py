@@ -52,6 +52,7 @@ pages = {
     ],
     "Settings": [
         page("views/workspace.py", title="Workspace", icon=":material/folder_shared:"),
+        page("views/products.py", title="Products", icon=":material/edit_note:"),
         page("views/datacheck.py", title="Data check", icon=":material/rule:"),
         page("views/connections.py", title="Connections & alerts", icon=":material/hub:"),
         page("views/security.py", title="Security", icon=":material/shield:"),

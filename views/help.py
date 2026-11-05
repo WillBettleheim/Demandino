@@ -54,6 +54,8 @@ PAGES = [
      "Up to four products side by side: forecast, life stage and revenue."),
     ("views/assistant.py", "Ask Demandino", ":material/auto_awesome:",
      "Ask questions about a forecast in plain language."),
+    ("views/products.py", "Products", ":material/edit_note:",
+     "Edit a product's name, category or price, or remove it. Anything can be put back."),
     ("views/datacheck.py", "Data check", ":material/rule:",
      "Problems found in your uploaded file — duplicates, returns, gaps, odd prices — and how to fix them."),
     ("views/accuracy.py", "Model accuracy", ":material/fact_check:",

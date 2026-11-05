@@ -40,6 +40,7 @@ your own data, choose **Upload my CSV** in the sidebar. You can download a templ
   CSV export.
 - **Home.** A welcome page with an interactive tour of the product.
 - **Dashboard.** Your shop at a glance, with a one-click Excel report of the whole shop.
+- **Products.** Edit a product's name, category or price, or remove it, without changing your sales data.
 - **Compare products.** Up to four products side by side: forecast shape, life stage, revenue and recent change.
 - **Security.** Signed-in browsers, stored keys (names only) and recent sign-ins, with "sign out everywhere".
 - **Inbox.** One list of everything needing attention — orders due now or this week, stock about to expire,

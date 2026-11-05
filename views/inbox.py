@@ -6,7 +6,7 @@ from demandino.state import app
 A = app()
 ui.page_header("Inbox", "Everything that needs your attention, from every part of Demandino, in one place — "
                "most urgent first.", eyebrow="Dashboard")
-saved = db.get_setting(A.user_id, f"stock:{A.data_key}") if A.user_id else None
+saved = db.get_setting(A.user_id, f"stock:{A.settings_key}") if A.user_id else None
 items = inbox.gather(A, ui.currency())
 
 counts = {k: sum(i["priority"] == k for i in items) for k in inbox.PRIORITY}

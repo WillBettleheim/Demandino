@@ -65,14 +65,16 @@ def _plan(data_key: str, stock: pd.DataFrame, _fc, level_uncertainty: float) -> 
 
 def gather(app, currency: str = "") -> list[dict]:
     """Everything needing attention for the active dataset (used by the Dashboard and Inbox pages)."""
-    saved = db.get_setting(app.user_id, f"stock:{app.data_key}") if app.user_id else None
-    stock = st.session_state.get(f"pl_stock_{app.data_key}")
+    saved = db.get_setting(app.user_id, f"stock:{app.settings_key}") if app.user_id else None
+    stock = st.session_state.get(f"pl_stock_{app.settings_key}")
     stock = stock if stock is not None else (pd.DataFrame(saved) if saved else default_stock(app.sales))
     plan = _plan(app.data_key, stock, app.fc, app.level_uncertainty)
     stages = lifecycle.stages(app.sales).set_index("product_id")["stage"].astype(str).to_dict()
     lost = lostsales.window(lostsales.daily(app.fc.sales), app.fc.sales["date"].max(), 14)
     saved_targets = []
     for t in (db.get_setting(app.user_id, f"targets:{app.base_key}", []) if app.user_id else []):
+        if not targets.still_sold(app.fc, t["products"]):
+            continue
         p = targets.progress(app.fc, t["products"], pd.Timestamp(t["start"]), pd.Timestamp(t["end"]), t["metric"])
         saved_targets.append({**t, "chance": targets.chance(p, t["target"])})
     return collect(plan, app.drift()[0], stages, lost, saved_targets, currency)

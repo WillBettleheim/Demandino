@@ -17,8 +17,8 @@ def needs_for(data_key: str, stock: pd.DataFrame, months: int) -> pd.DataFrame:
 
 ui.page_header("Buying budget", "How much each month needs to spend on new stock to meet the forecast, after "
                "using the stock you already have — against the budget you set.", eyebrow="Forecast")
-saved = db.get_setting(A.user_id, f"stock:{A.data_key}") if A.user_id else None
-stock = st.session_state.get(f"pl_stock_{A.data_key}")
+saved = db.get_setting(A.user_id, f"stock:{A.settings_key}") if A.user_id else None
+stock = st.session_state.get(f"pl_stock_{A.settings_key}")
 stock = stock if stock is not None else (pd.DataFrame(saved) if saved else default_stock(A.sales))
 n_months = st.segmented_control("Months ahead", [3, 6, 12], default=6, required=True, key="bb_months")
 n = needs_for(A.data_key, stock, int(n_months))

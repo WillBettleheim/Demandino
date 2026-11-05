@@ -49,7 +49,7 @@ if not products:
     st.info("Pick at least one category or product.", icon=":material/touch_app:")
     st.stop()
 change = whatif.Change(price_change, discount if start is not None else 0.0, start, end)
-saved = db.get_setting(A.user_id, f"stock:{A.data_key}") if A.user_id else None
+saved = db.get_setting(A.user_id, f"stock:{A.settings_key}") if A.user_id else None
 costs = tuple(sorted(pd.DataFrame(saved).groupby("product_id")["unit_cost"].mean().items())) if saved else ()
 df = run_for(A.data_key, tuple(products), change, int(horizon), costs)
 t = whatif.totals(df)

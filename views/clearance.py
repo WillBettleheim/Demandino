@@ -22,10 +22,10 @@ ui.page_header("Clear slow stock",
                "Find products with more stock than they'll sell, and the smallest markdown that clears the excess "
                "in time — so cash isn't sitting on the shelf.", eyebrow="Forecast")
 
-saved = db.get_setting(A.user_id, f"stock:{A.data_key}") if A.user_id else None
-stock = st.session_state.get(f"pl_stock_{A.data_key}")
+saved = db.get_setting(A.user_id, f"stock:{A.settings_key}") if A.user_id else None
+stock = st.session_state.get(f"pl_stock_{A.settings_key}")
 stock = stock if stock is not None else (pd.DataFrame(saved) if saved else default_stock(A.sales))
-if saved is None and f"pl_stock_{A.data_key}" not in st.session_state:
+if saved is None and f"pl_stock_{A.settings_key}" not in st.session_state:
     st.caption("Using illustrative stock levels. Enter your real stock on **Demand planning** (and save it) for "
                "advice about your shop.")
 
