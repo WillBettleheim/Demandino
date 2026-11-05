@@ -1,6 +1,8 @@
 """Sign-in, sign-up and sign-out in the sidebar; keeps the user signed in across reloads via a session cookie."""
 from __future__ import annotations
 
+import time
+
 import streamlit as st
 
 from . import db
@@ -16,8 +18,23 @@ def _cookie_token() -> str | None:
         return None
 
 
+SESSION_RECHECK = 5  # seconds between checks that an open tab's session is still valid
+
+
+def _session_still_valid(uid: int) -> bool:
+    """An open tab stops working once its session ends: signed out everywhere, password changed or account deleted."""
+    token = st.session_state.get("session_token")
+    if token is None or time.time() - st.session_state.get("_session_checked", 0) < SESSION_RECHECK:
+        return True
+    st.session_state["_session_checked"] = time.time()
+    return db.session_user(token) == uid
+
+
 def current_user() -> int | None:
     uid = st.session_state.get("user_id")
+    if uid is not None and not _session_still_valid(uid):
+        sign_out()
+        return None
     if uid is None and not st.session_state.get("signed_out"):
         uid = db.session_user(_cookie_token())
         if uid is not None:
@@ -113,10 +130,11 @@ def sidebar_account() -> None:
             if st.form_submit_button("Create account", type="primary", width="stretch"):
                 if pw != pw2:
                     st.error("The passwords don't match.")
-                elif not _attempt_allowed():
-                    st.error("Too many attempts in this session. Reload the page later.")
+                elif not _attempt_allowed() or db.signup_blocked(_client_ip()):
+                    st.error("Too many new accounts have been created recently. Please try again later.")
                 else:
                     try:
+                        db.record_signup(_client_ip())
                         _sign_in(db.create_user(user, pw))
                         st.rerun()
                     except db.AuthError as exc:
