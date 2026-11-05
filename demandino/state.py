@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import hashlib
 import re
+import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -34,16 +36,33 @@ CACHE_DIR = ROOT / ".cache"
 REAL_DATA = ROOT / "data" / "uci_online_retail_daily.csv"
 
 
+CACHE_DAYS = 7
+MAX_CONCURRENT_TRAINING = 2    # the rest wait their turn, so a burst of uploads can't take the server down
+MAX_TRAININGS_PER_HOUR = 20    # new forecasts one browser session can start
+_TRAINING = threading.BoundedSemaphore(MAX_CONCURRENT_TRAINING)
+_PERSONAL_KEY = re.compile(r"^(upload-|ws-)|-(drv|fx|blk|cat)")  # anything specific to one person's data or choices
+
+
 def _remove_stale_cache() -> None:
-    """Delete cache files from older model versions, and any made with user data before that was disallowed."""
+    """Delete cache files that are old, from older model versions, or made with one person's data or choices."""
+    oldest = time.time() - CACHE_DAYS * 86400
     for path in CACHE_DIR.glob("*.pkl"):
-        if not path.stem.endswith(f"-v{MODEL_VERSION}") or "-drv" in path.stem:
-            path.unlink(missing_ok=True)
+        try:
+            if (not path.stem.endswith(f"-v{MODEL_VERSION}") or _PERSONAL_KEY.search(path.stem.split("-", 1)[-1])
+                    or path.stat().st_mtime < oldest):
+                path.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+def _train(build: Callable[[], object]) -> object:
+    with _TRAINING:
+        return build()
 
 
 def _disk_cached(name: str, data_key: str, build: Callable[[], object]) -> object:
-    if data_key.startswith(("upload-", "ws-")) or "-drv" in data_key:
-        return build()  # models of user data (including uploaded outside factors) stay in memory only
+    if _PERSONAL_KEY.search(data_key):
+        return _train(build)  # personal data stays in memory only, and endless variations can't fill the disk
     _remove_stale_cache()
     path = CACHE_DIR / f"{name}-{data_key}-v{MODEL_VERSION}.pkl"
     if path.exists():
@@ -54,7 +73,7 @@ def _disk_cached(name: str, data_key: str, build: Callable[[], object]) -> objec
         except Exception:  # noqa: BLE001 - stale or corrupt cache: rebuild
             pass
         path.unlink(missing_ok=True)
-    obj = build()
+    obj = _train(build)
     try:
         dump_signed(obj, path)
     except OSError:
@@ -102,7 +121,7 @@ def _backtest(data_key: str, _sales: pd.DataFrame, _country: str | None, _driver
 
 @st.cache_data(show_spinner="Checking recent sales against the forecast…", max_entries=12, ttl=6 * 3600)
 def _drift(data_key: str, weeks: int, _fc: DemandForecaster) -> tuple[pd.DataFrame, pd.Timestamp]:
-    old, cutoff = monitor.holdout_model(_fc, weeks)
+    old, cutoff = _train(lambda: monitor.holdout_model(_fc, weeks))
     return monitor.drift_report(old, cutoff, weeks), cutoff
 
 
@@ -325,6 +344,10 @@ def sidebar_data_source() -> AppState | None:
     settings_key = full_key
     if catalog.has_edits(edits):
         full_key += "-cat" + catalog.digest(edits)
+    if not _training_allowed(full_key):
+        st.warning("That's a lot of new forecasts in a short time. Please wait a while before changing the data again.",
+                   icon=":material/hourglass_top:")
+        return None
     return AppState(sales=sales, data_key=full_key, source=source, country=country, drivers=drivers,
                     bulk=(keep, add), base_key=base_key, settings_key=settings_key,
                     catalog_id=catalog.dataset_id(key), fx_rate=rate)
@@ -397,6 +420,17 @@ def set_bulk_choices(base_key: str, keep: set, add: set) -> None:
 @st.cache_data(show_spinner=False, max_entries=4, ttl=3600)
 def _load_saved(uid: int, dataset_id: int, created: float) -> pd.DataFrame | None:
     return db.load_dataset(uid, dataset_id)
+
+
+def _training_allowed(key: str) -> bool:
+    """Each new combination of data and settings trains a model, so one session can only start so many an hour."""
+    now = time.time()
+    seen = {k: t for k, t in st.session_state.get("_trainings", {}).items() if t > now - 3600}
+    allowed = key in seen or len(seen) < MAX_TRAININGS_PER_HOUR
+    if allowed:
+        seen.setdefault(key, now)
+    st.session_state["_trainings"] = seen
+    return allowed
 
 
 def raw_sales() -> pd.DataFrame:
