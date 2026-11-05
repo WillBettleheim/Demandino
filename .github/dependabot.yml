@@ -1,0 +1,11 @@
+# Opens a pull request when a dependency or workflow action has an update, including security fixes.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly

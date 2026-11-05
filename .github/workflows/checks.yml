@@ -1,0 +1,27 @@
+name: Checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# This workflow only reads the code, so a compromised step can't change the repository.
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - run: pip install -r requirements.txt pytest
+      - name: Security check
+        run: python scripts/security_check.py --history --deps
+      - name: Tests
+        run: python -m pytest -q
