@@ -1,212 +1,143 @@
-# Demandino: ML demand forecasting
+# Demandino
 
-Demandino predicts how many units a product will sell, day by day. It learns sales patterns from your history
-(trend, weekday and yearly seasonality, holidays, price and promotion effects) and gives a detailed analysis
-of each forecast.
+**Know what sells before it sells.** Demandino is a demand forecasting and inventory planning app for small shops. It
+learns from your sales history, then shows how much of each product will sell, when to reorder and what a price
+change or promotion would do.
 
-## Run it
+![Python](https://img.shields.io/badge/Python-3.14-0B1730)
+![Streamlit](https://img.shields.io/badge/Streamlit-1.66-E8604C)
+![scikit-learn](https://img.shields.io/badge/scikit--learn-1.9-0B1730)
+[![Checks](https://github.com/WillBettleheim/Demandino/actions/workflows/checks.yml/badge.svg)](https://github.com/WillBettleheim/Demandino/actions/workflows/checks.yml)
+
+![The Demandino home page](docs/images/home.jpg)
+
+| Your shop at a glance | One product's forecast |
+|---|---|
+| ![Dashboard](docs/images/dashboard.jpg) | ![Forecast page](docs/images/forecast.jpg) |
+
+## What kind of project is this?
+
+| | |
+|---|---|
+| **Type** | Web app for sales forecasting and stock planning |
+| **For** | Small shops and online sellers with daily sales data |
+| **Method** | Gradient-boosted trees (scikit-learn) with prediction ranges calibrated on sales the model hasn't seen |
+| **Built with** | Python, Streamlit, pandas, scikit-learn, Plotly, SQLite |
+| **Status** | Working demo. Not yet tested with real shops or hosted for public use |
+
+## What it does
+
+**Forecast**
+- Daily forecasts for each product, up to 180 days ahead, with a likely range rather than one number
+- Estimates for new products from their category, price or a similar product
+- Learns weekdays, seasons, holidays, prices and promotions, and corrects for stock-outs and one-off bulk orders
+- Alerts when a product sells faster or slower than expected, with the reason each forecast moved
+
+**Plan**
+- Order quantities and reorder dates for the whole shop, within a budget
+- Purchase orders, real supplier delivery times, stock transfers and shelf-life limits
+- Monthly buying budget, and markdowns to clear slow stock
+
+**Grow**
+- Test a price change or sale on one product or the whole shop before you make it
+- Sales targets with the chance of reaching them and what would close the gap
+- Products often bought together, and the money lost to stock-outs
+
+**Manage**
+- A dashboard and an inbox of what needs attention, most urgent first
+- Upload a CSV or connect Google Sheets, Shopify, WooCommerce or Amazon reports
+- Check uploads for problems, and edit or remove products without changing your data
+- Excel and PDF reports, share links, and alerts by Slack or email
+- An optional AI assistant (Claude) that answers questions about a forecast
+
+## Quick start
+
+You need Python 3.14.
 
 ```bash
+git clone https://github.com/WillBettleheim/Demandino.git
+cd Demandino
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 .venv/bin/streamlit run app.py
 ```
 
-The app opens with a realistic **sample dataset** (30 products, 6 categories, 3 years of daily sales). To use
-your own data, choose **Upload my CSV** in the sidebar. You can download a template from the same place.
+It opens at http://localhost:8501 with a sample shop of 30 products, so you can try everything without any data of your
+own. The first forecast trains the model, which can take a minute. After that it's quick.
 
-| column | required | notes |
+Optional settings are listed in [`.env.example`](.env.example). Keep real keys out of the code.
+
+## Using your own data
+
+In the sidebar, choose **Data → My CSV**. Use one row per product per day:
+
+| Column | Required | Notes |
 |---|---|---|
-| `date` | ✓ | one row per product per day (missing days count as 0 sales) |
-| `product_id` | ✓ | or `product_name` / `sku` |
-| `units_sold` | ✓ | also accepts `quantity`, `units`, `qty`, `sales` |
-| `price` | ✓ | actual selling price that day |
-| `product_name`, `category` | | |
-| `regular_price` | | inferred from recent price ceiling if missing |
-| `promo` | | 0/1; inferred from price < regular price if missing |
+| `date` | Yes | Also reads names like `Order Date`. Day-first and month-first dates both work |
+| `product_id` | Yes | Also reads `SKU`, `Item` and similar, or the product name |
+| `units_sold` | Yes | Also reads `Quantity`, `Qty Sold` and similar |
+| `price` | Yes | Also reads `Unit Price` and similar. Values like `$1,010.00` are fine |
+| `product_name`, `category` | No | Make results easier to read and forecasts better |
+| `regular_price`, `promo` | No | Worked out from the price if missing |
+| `on_hand` | No | Stock on hand, which helps spot stock-outs |
 
-## Pages
+Two years of history is ideal. A product needs at least 114 days: 86 to learn from and 28 to test on.
 
-- **Forecast a product.** Inputs sit in a panel on the left and results update live:
-  - **Product:** an existing product, or a new one estimated from its category and price, a similar product, or
-    a short sales history you upload. New launches can have a ramp-up period.
-  - **Plans:** price, cost, horizon, promotions (recurring, specific dates, Black Friday) and demand events such
-    as campaigns or closures.
-  - **Inventory:** stock on hand, lead time, days between orders and service level.
+## How accurate is it?
 
-  Results include expected units with an 80% range, revenue, profit, a confidence label and key findings. Tabs
-  cover the forecast (with last year overlaid), a drivers waterfall, weekly and monthly breakdowns, price and
-  promotion what-ifs, an inventory plan, sales patterns, saved scenarios compared side by side, and an Excel or
-  CSV export.
-- **Home.** A welcome page with an interactive tour of the product.
-- **Dashboard.** Your shop at a glance, with a one-click Excel report of the whole shop.
-- **Products.** Edit a product's name, category or price, or remove it, without changing your sales data.
-- **Compare products.** Up to four products side by side: forecast shape, life stage, revenue and recent change.
-- **Security.** Signed-in browsers, stored keys (names only) and recent sign-ins, with "sign out everywhere".
-- **Inbox.** One list of everything needing attention — orders due now or this week, stock about to expire,
-  end-of-life products still on order, products drifting from their forecast, recent stock-outs and sales
-  targets at risk — most urgent first, each linking to the page that handles it.
-- **Demand planning.** Forecasts every product at once from an editable table of stock and lead times. Each
-  product gets a status, a run-out date, an order-by date and an order quantity, and you can download a
-  purchase list.
-- **Perishable stock.** Give products a shelf life on Demand planning. Stock likely to expire before it sells is
-  flagged (and left out of reorder timing), orders are capped to what can sell before expiring, and minimum-order
-  rules that force waste are called out. Expiry warnings also appear in the weekly digest.
-- **Buying budget.** Open-to-buy by month and category: money needed for new stock to meet the forecast after
-  using stock on hand, against a monthly budget, with over-budget months flagged.
-- **Grow demand.** Tests the levers you control by re-running the model with one change at a time: regular price,
-  promotion depth and frequency, the best week to promote, and staying in stock. It ranks the options by profit
-  and finds the most profitable tested plan that reaches a sales goal. General good-practice ideas the model
-  can't measure (listings, reviews, bundles, channels) are listed separately.
-- **Sales targets.** Set a target for a month, a quarter or custom dates, in units or revenue, for the whole shop,
-  a category or a product. It adds the forecast for the days left to what's been sold, gives the chance of making
-  it, and says what would close a gap (price, promotions, which products to push). Signed-in users can save targets.
-- **What changed.** Each product's forecast now vs a week ago, with the reason in plain words ("Down 4% … mainly
-  last week's sales (−180); last year's pattern (+32). Last week sold 549 — less than the 633 expected") and a
-  waterfall of the parts: last week's sales, last year's pattern, being a week closer, price vs recent weeks.
-- **Store what-if.** Apply one change — all prices +5%, 20% off a category for a week — to the whole shop, some
-  categories or chosen products, and see units, revenue and profit before and after, by category and product,
-  with which products gain or lose and the result if you applied it only to the winners.
-- **Demand alerts.** A copy of the model trained without the last 4 (or 6, 8) weeks forecasts them, and products
-  whose real weekly sales kept landing outside its range on the same side are flagged as selling faster or slower
-  than expected, with advice and a link to the product. The alerts are also added to the weekly digest.
-- **Clear slow stock.** Finds products with more stock than they'll sell in your chosen number of days and suggests
-  the smallest markdown that clears the excess in time, from each product's price sensitivity, with the cash freed
-  and holding cost avoided.
-- **Your adjustments, scored.** Add reasons and % changes on the Forecast page ("campaign +30%"). Tracked forecasts
-  keep the model's own version too, and the Forecast tracking page shows whether each adjustment made the forecast
-  more or less accurate once real sales arrive.
-- **One-off bulk orders.** Days far above normal that no promotion explains (usually one large order) are learned
-  as a normal day, and the product's average bulk volume is added back as a steady allowance so totals stay
-  unbiased. On the real data this cut weekly error from 49.7% to 47.3% across five unseen windows. Review the
-  flagged days on the Explore page, untick any that were real demand, or mark others as one-off.
-- **Data check.** Uploaded files are checked before training for unreadable rows, future dates, duplicate rows,
-  returns, odd prices, long gaps and products with little history. Each problem is explained with examples and a
-  choice of fix; nothing is changed silently. A deliberately messy example file is included to try it.
-- **Product life stages.** Each product is labelled launching, growing, mature, declining or end of life from its
-  age, growth against the same months last year and distance from its best 90 days, with stock advice for each
-  stage. Demand planning shows the stage and warns when end-of-life products are still on the order list.
-- **Weather (optional).** Under Outside factors, type a town or city and Demandino adds daily temperature and rain
-  from Open-Meteo (free, no key): past weather, the 16-day forecast, then the local climate normal. Only the
-  place's location and dates are sent. On the real UCI gift shop it made no measurable difference (weekly error
-  47.3% either way), so it's off by default and meant for weather-sensitive products.
-- **Bought together.** From order lines (one row per product per order), finds pairs bought together more often
-  than chance, suggests bundles and "goes well with" pairings, and warns before dropping a declining product
-  that customers often buy with a steady seller. The real UCI orders are included
-  (`data/uci_online_retail_baskets.csv`, made by `scripts/prepare_uci.py`); upload your own on the page.
-- **Stock transfers.** With more than one warehouse, Demand planning suggests moving spare stock to warehouses about
-  to run short before buying more — donors keep enough for their own next delivery cycle plus safety stock — and
-  shows the order money it saves, with a downloadable transfer list.
-- **Supplier delivery times.** Mark purchase orders as received with the dates they were placed and arrived, and
-  Demandino learns each supplier's real delivery time, how much it varies, how often it's late and whether it's
-  getting slower. Demand planning can plan with "average + a margin for the variation" instead of a fixed lead time,
-  so unreliable suppliers get more safety stock. Add a supplier per product in the stock table.
-- **Lost sales.** Puts a money figure on stock-outs: demand on days a product had run out (estimated from the days
-  around them) minus what sold, valued at the price, with lost profit from your unit costs. By product, by month
-  and by stock-out episode, with the products that keep running out called out.
-- **Explore sales patterns.** Trend, seasonality, weekday × month heatmap, year-over-year, promo lift, price
-  elasticity, unusual-day detection and product comparison.
-- **Portfolio overview.** Revenue by category, category growth, ABC × XYZ segmentation and momentum.
-- **Model accuracy.** A back-test on the last 90 days compared with simple baselines, plus error by weeks ahead
-  and by category, and feature importance.
+Each figure comes from forecasts of sales the model never saw, averaged over several test periods. It shows how far the
+forecast was from what really sold, as a share of what sold.
 
-**Light and dark mode.** Use the sun/moon switch in the sidebar. The "Harbor" theme (navy, white and coral) has a
-deep navy dark mode and a crisp, cool light mode, with a chart palette checked for colour-blind readers, and every chart and card follows the active mode.
+| What's being forecast | Real store | Simulated shop |
+|---|---|---|
+| Whole shop, per month | 9.3% | 2.9% |
+| One category, per month | 12.4% | 5.5% |
+| Whole shop, per week | 19.6% | 6.7% |
+| One product, 90-day total | 21.4% | 7.9% |
+| One product, per month | 28.9% | 10.3% |
+| One product, per week | 46.8% | 17.4% |
+| One product, per day | 83.3% | 37.4% |
 
-The first run trains the model (about 10 seconds) and saves it in `.cache/`, so later runs start instantly.
+The real store is a UK gift wholesaler whose sales come in irregular bursts, which makes single products hard to predict.
+In the 90-day test on this data, the model was closer than a recent-average forecast (44% against 48% weekly), and real
+daily sales landed inside the likely range about 95% of the time. Plan by the week or month where you can. The **Model
+accuracy** page runs the same test on your own data.
 
-- **Store & category totals.** Product forecasts rolled up into categories and the whole store, with ranges that
-  account for shared uncertainty. The totals always add up.
-- **Ask Demandino.** An AI assistant (Claude Opus 5.5) that answers plain-language questions about the forecast on
-  screen. It needs an Anthropic API key: set `ANTHROPIC_API_KEY` on the server, or save a key in your workspace.
-  Only a summary of the forecast is sent, never your raw files.
-- **Workspace** (sign in required).
-  - Accounts: local accounts with scrypt-hashed passwords, a lockout after repeated failures, and sessions that
-    survive reloads.
-  - Saved data: datasets, scenarios (open any saved scenario back on the Forecast page) and share links (read-only,
-    7 days, revocable).
-  - Account settings: change password, or delete your account with all its data.
-- **Connections & alerts.**
-  - Imports: Google Sheets, the Shopify Admin API, the WooCommerce REST API and Amazon "All Orders" reports.
-  - Alerts: order-now, stock-out-soon and demand-spike/drop alerts, plus a weekly digest, sent to Slack or email.
-  - Automatic sending: schedule `scripts/send_digests.py` with cron.
-- **Purchase orders.** A purchase list sent from Demand planning becomes a draft that you approve, reject or mark
-  as ordered.
-- **Forecast tracking.** Track a forecast and compare it with the real sales as they arrive.
+## Security
 
-**More forecasting features.**
-- **Model inputs:**
-  - **Country holidays:** public holidays for the country you pick in the sidebar.
-  - **Stock-out correction:** days that look sold out are filled with estimated demand, and you can add an
-    `on_hand` column to mark them exactly.
-  - **Outside factors:** upload a CSV of daily values such as ad spend or temperature.
-- **Day explainer:** "Why this day?" on the forecast's Drivers tab.
-- **Demand types:** each product is classed as smooth, erratic, intermittent or lumpy.
-- **Cross-product effects:** the Grow demand page counts promotions net of sales taken from sibling products.
-- **Ordering rules:** minimum order quantities (MOQ), case packs, unit costs, several warehouses, a purchase budget
-  and a weekly cash-flow chart.
-- **Display:** currency conversion with your own exchange rate, PDF reports and a phone-friendly layout.
-
-## Terms & data handling
-
-The app asks you to accept terms & conditions before first use (see `demandino/legal.py`, and the Terms page
-in the app). They are a general template, not legal advice; have them reviewed before offering the app to
-customers. Uploaded files are processed in memory and never written to disk. See [SECURITY.md](SECURITY.md).
-
-## Accuracy on real data
-
-The model is tested on real sales from the [UCI Online Retail II](https://archive.ics.uci.edu/dataset/502/online+retail+ii)
-dataset: a UK online gift wholesaler, Dec 2009 – Dec 2011, using its 40 most regularly sold products (CC BY 4.0).
-Pick **Real store** in the sidebar to use it in the app.
-
-A "miss" is a day (or a product-week) where actual sales landed outside the predicted range. Each test window
-is 90 days the model never saw during training or calibration. Days the whole shop was closed are excluded.
-
-| Data | Unseen test window | Daily misses | Weekly misses | Daily WAPE (simple average) |
-|---|---|---|---|---|
-| Real · UCI | 10 Sep – 9 Dec 2011 | 4.2% | 2.9% | 82% (90%) |
-| Real · UCI | 12 Jun – 10 Sep 2011 | 5.2% | 2.3% | 90% (101%) |
-| Simulated | 30 Jul – 28 Oct 2026 | 3.9% | 1.7% | 36% (46%) |
-| Simulated | 1 May – 30 Jul 2026 | 5.6% | 1.4% | 38% (45%) |
-
-Point error (WAPE) is a separate question from range reliability. A single product's daily sales are noisy,
-and on the wholesaler's lumpy orders the point error stays high. The ranges are honest about that rather than
-precise.
-
-To reproduce:
+Passwords are hashed, saved keys are encrypted, and uploads, outgoing requests and account storage are all limited. Tests
+try the attacks that matter, and these checks run on every push:
 
 ```bash
-.venv/bin/python -I scripts/prepare_uci.py data/raw/online_retail_ii/online_retail_II.xlsx data/uci_online_retail_daily.csv 40
-.venv/bin/python scripts/benchmark.py
+.venv/bin/python scripts/security_check.py --history --deps
 ```
 
-The first command needs the dataset zip from the UCI link above, unzipped into `data/raw/online_retail_ii/`.
+Read [SECURITY.md](SECURITY.md) before you deploy it. It covers what's protected, the known limits and what the server
+needs. Back up the database with `scripts/backup.py`.
 
-## How the model works (`demandino/model.py`)
+## Project layout
 
-- **One global model for all products.** A scikit-learn `HistGradientBoostingRegressor` is trained on every
-  product at once. Each training row asks: "standing at day *o* with this history, what sells on day *o + gap*?"
-  This is a direct multi-horizon forecast with no recursive error build-up.
-- **Features:**
-  - the recent demand level and momentum
-  - demand in the same season last year, for both the product and its category
-  - discount depth, price compared with the recent average and with category peers, and the promo flag
-  - calendar features: weekday, annual cycle, Black Friday weekend, days to Christmas
-- **Scale-free target.** The model predicts units ÷ recent level, using a Poisson loss weighted by level. This
-  lets a product selling 3 units a day and one selling 300 share patterns.
-- **Uncertainty.** Quantile models (p5 and p95) give the daily range. The range is then conformally calibrated:
-  a model trained without the latest 180 days forecasts them from several start dates, and the range is widened
-  or narrowed until 95% of real outcomes fall inside. Multi-day totals include a level error calibrated the same
-  way.
-- **Price changes.** Promotional discounts are learned by the ML model. Permanent regular-price changes use each
-  product's own price elasticity (a log-log regression controlling for promo, weekday, month and trend), shrunk
-  toward its category. Tree models can't extrapolate prices reliably.
-- **New products.** A cold-start model (category and price positioning to demand level), a similar product
-  rescaled for price, or your expected daily sales. A launch ramp-up curve is optional.
+```text
+app.py          Starts the app and defines the menu
+views/          One file per page
+demandino/      Forecasting model, planning, accounts, connectors and security
+scripts/        Security check, backups, digests and data preparation
+tests/          Test suite
+data/           Real store sales used for testing
+```
 
-## Tests
+Run the tests with:
 
 ```bash
 .venv/bin/pip install pytest
-.venv/bin/python -m pytest -q tests
+.venv/bin/python -m pytest -q
 ```
+
+## Data
+
+The real store data comes from [UCI Online Retail II](https://archive.ics.uci.edu/dataset/502/online+retail+ii)
+(CC BY 4.0). The sample shop is simulated.
+
+## Disclaimer
+
+Forecasts are estimates to support your decisions, not guarantees.
