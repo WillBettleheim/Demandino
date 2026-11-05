@@ -1,14 +1,19 @@
 """Security check for this installation. Run before pushing or deploying; exits non-zero if anything fails.
 
-Usage: python scripts/security_check.py [--history]
+Usage: python scripts/security_check.py [--history] [--deps]
 Looks for keys in tracked files (and, with --history, in every past commit), checks that secret files are ignored
-by git and private on disk, and that the app's protective settings are on. It prints where a problem is, never the
-secret itself.
+by git and private on disk, and that the app's protective settings are on. With --deps it asks the OSV database about
+the installed packages, sending only their names and versions. It prints where a problem is, never the secret itself.
 """
+import importlib.metadata
+import json
+import os
 import re
 import stat
+import ssl
 import subprocess
 import sys
+import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -28,7 +33,8 @@ MUST_BE_IGNORED = [".env", ".data/demandino.db", ".data/.secret-key", ".cache/.s
                    "data/raw/orders.csv", "server.pem"]
 MUST_BE_PRIVATE = [".data", ".cache", ".data/demandino.db", ".data/.secret-key", ".cache/.signing-key"]
 REQUIRED_SETTINGS = ['enableXsrfProtection = true', 'enableCORS = true', 'showErrorDetails = "type"',
-                     'toolbarMode = "viewer"', 'maxUploadSize = 25']
+                     'toolbarMode = "viewer"', 'maxUploadSize = 25', 'enableStaticServing = false',
+                     'fileWatcherType = "none"', 'magicEnabled = false']
 
 
 def find_secrets(text: str) -> list[str]:
@@ -77,8 +83,32 @@ def check_settings() -> list[str]:
     return [f"setting missing from .streamlit/config.toml: {s}" for s in REQUIRED_SETTINGS if s not in config]
 
 
+def check_dependencies() -> list[str]:
+    """Installed packages with known vulnerabilities, according to osv.dev."""
+    packages = sorted({(d.metadata["Name"].lower(), d.version) for d in importlib.metadata.distributions()
+                       if d.metadata["Name"]})
+    body = {"queries": [{"package": {"name": n, "ecosystem": "PyPI"}, "version": v} for n, v in packages]}
+    request = urllib.request.Request("https://api.osv.dev/v1/querybatch", json.dumps(body).encode(),
+                                     {"Content-Type": "application/json", "User-Agent": "demandino-security-check"})
+    try:
+        import certifi
+        context = ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        context = ssl.create_default_context()
+    try:
+        with urllib.request.urlopen(request, context=context, timeout=60) as response:  # noqa: S310 - fixed https address
+            results = json.load(response)["results"]
+    except OSError as exc:
+        return [f"could not reach osv.dev ({type(exc).__name__})"]
+    return [f"{name} {version}: {', '.join(v['id'] for v in found['vulns'])}"
+            for (name, version), found in zip(packages, results) if found.get("vulns")]
+
+
 def advice() -> list[str]:
     tips = []
+    if not os.environ.get("DEMANDINO_SECRET_KEY"):
+        tips.append("DEMANDINO_SECRET_KEY isn't set here: on a server, set it so the encryption key isn't stored next "
+                    "to the database it protects.")
     if (ROOT / ".data" / "demo-account.txt").exists():
         tips.append(".data/demo-account.txt holds a test password in plain text: delete it once you don't need it.")
     return tips
@@ -89,6 +119,8 @@ def main() -> int:
               ("Secret files private on disk", check_private), ("Protective settings", check_settings)]
     if "--history" in sys.argv:
         checks.append(("Keys in git history", scan_history))
+    if "--deps" in sys.argv:
+        checks.append(("Known vulnerabilities in dependencies", check_dependencies))
     failed = False
     for name, check in checks:
         problems = check()

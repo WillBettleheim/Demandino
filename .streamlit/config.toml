@@ -6,6 +6,7 @@ maxMessageSize = 50
 enableXsrfProtection = true
 enableCORS = true
 runOnSave = false
+enableStaticServing = false
 
 # Don't watch files or evaluate bare expressions on the page in production.
 fileWatcherType = "none"
