@@ -259,7 +259,8 @@ def test_data_check_fixes_change_the_data_as_chosen():
     assert default["price"].max() < 1000  # the ×100 price was replaced by the usual price
     chosen = quality.apply_fixes(raw, {"gaps": "stockout", "prices": "keep"}, today=today)
     assert chosen["stockout"].sum() == 20 and chosen["price"].max() > 1000
-    assert quality.apply_fixes(raw, {"future": "keep"}, today=today)["date"].max().year == 2062
+    with pytest.raises(ValueError, match="limit is 10"):  # keeping a year typed as 2062 would fill in 36 years of days
+        quality.apply_fixes(raw, {"future": "keep"}, today=today)
     summed = default.set_index(["product_id", "date"])["units_sold"]
     last = quality.apply_fixes(raw, {"duplicates": "last"}, today=today).set_index(["product_id", "date"])["units_sold"]
     assert summed.sum() > last.sum()  # adding up duplicated rows counts more than keeping one

@@ -285,3 +285,32 @@ def test_example_numbers_are_called_examples():
     assert "An example stock of 500 units" in _text(at) and "a guess until you enter your unit cost" in _text(at)
     at.number_input(key="fc_stock").set_value(100_000).run()
     assert "Your 100,000 units would cover" in _text(at) and "An example stock" not in _text(at)
+
+
+def test_open_tabs_stop_working_after_sign_out_everywhere():
+    import secrets as _s
+
+    from demandino import account, db
+    uid = db.create_user("s" + _s.token_hex(4), "a very long password")
+    token = db.new_session(uid)
+    at = _new_app()
+    at.session_state["user_id"] = uid
+    at.session_state["session_token"] = token
+    at.run()
+    at.switch_page("views/security.py").run()
+    assert at.session_state["user_id"] == uid
+    db.end_all_sessions(uid)
+    at.session_state["_session_checked"] = 0
+    at.run()
+    assert not at.exception, at.exception
+    assert "user_id" not in at.session_state and account.COOKIE
+
+
+def test_one_session_cannot_start_endless_training():
+    from demandino import state
+    at = _new_app()
+    at.run()
+    at.session_state["_trainings"] = {f"k{i}": __import__("time").time() for i in range(state.MAX_TRAININGS_PER_HOUR)}
+    at.switch_page("views/home.py").run()
+    assert not at.exception, at.exception
+    assert any("a lot of new forecasts" in w.value for w in at.warning)
