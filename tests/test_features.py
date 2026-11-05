@@ -585,3 +585,42 @@ def test_shop_report_is_an_excel_file_with_safe_text(sales):
     got = pd.read_excel(io.BytesIO(data), sheet_name=None)
     assert set(got) == {"Summary", "Needs attention", "Life stages", "Lost sales"}
     assert got["Needs attention"].loc[0, "Detail"].startswith("'=")
+
+
+def test_product_edits_lay_over_sales_and_can_be_undone(sales):
+    from demandino import catalog
+    before = sales.copy()
+    pid, other = sales["product_id"].unique()[:2]
+    original = catalog.originals(sales)
+    row = original.set_index("product_id").loc[pid]
+    rows = pd.DataFrame({"product_id": [pid, other], "name": ["  New name\x00 ", "x"], "category": ["New cat", "x"],
+                         "price": [float(row["regular_price"]) * 2, 1.0], "remove": [False, True]})
+    edits, log = catalog.merge(catalog.EMPTY, original, rows)
+    assert edits["removed"] == [other] and edits["changes"][pid]["name"] == "New name" and len(log) == 2
+    out = catalog.apply(sales, edits)
+    pd.testing.assert_frame_equal(sales, before)  # the sales themselves are never changed
+    assert other not in set(out["product_id"])
+    g = out[out["product_id"] == pid].sort_values("date")
+    assert set(g["product_name"]) == {"New name"} and set(g["category"]) == {"New cat"}
+    assert g["regular_price"].iloc[-1] == pytest.approx(row["regular_price"] * 2)
+    assert g["regular_price"].iloc[:-1].tolist() == sales[sales["product_id"] == pid].sort_values("date")[
+        "regular_price"].iloc[:-1].tolist()  # past sales keep their real prices
+    assert catalog.apply(sales, catalog.EMPTY) is sales
+
+
+def test_product_edit_rules(sales):
+    from demandino import catalog
+    original = catalog.originals(sales)
+    r = original.iloc[0]
+    good = dict(product_id=r["product_id"], name=r["product_name"], category=r["category"],
+                price=float(r["regular_price"]), remove=False)
+    edits, log = catalog.merge(catalog.EMPTY, original, pd.DataFrame([good]))  # nothing changed
+    assert not catalog.has_edits(edits) and log == []
+    for bad in ({"name": "   "}, {"category": ""}, {"price": 0.0}):
+        with pytest.raises(ValueError):
+            catalog.merge(catalog.EMPTY, original, pd.DataFrame([{**good, **bad}]))
+    # Prices shown after a currency conversion are saved in the data's own currency.
+    edits, _ = catalog.merge(catalog.EMPTY, original, pd.DataFrame([{**good, "price": good["price"] * 2 * 3}]), 3.0)
+    assert edits["changes"][r["product_id"]]["price"] == pytest.approx(good["price"] * 2)
+    assert catalog.dataset_id("sample-2026-01-01") == "sample" and catalog.dataset_id("upload-abc") == "upload-abc"
+    assert catalog.can_forecast(sales) and not catalog.can_forecast(sales.iloc[:0])

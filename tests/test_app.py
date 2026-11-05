@@ -6,7 +6,7 @@ from demandino.legal import TERMS_VERSION
 
 PAGES = ["views/forecast.py", "views/planning.py", "views/advisor.py", "views/explore.py", "views/overview.py",
          "views/accuracy.py", "views/alerts.py", "views/clearance.py", "views/targets.py", "views/datacheck.py",
-         "views/home.py", "views/welcome.py", "views/compare.py", "views/lifecycle.py", "views/together.py", "views/changes.py", "views/lostsales.py",
+         "views/home.py", "views/welcome.py", "views/compare.py", "views/products.py", "views/lifecycle.py", "views/together.py", "views/changes.py", "views/lostsales.py",
          "views/whatif.py", "views/budget.py", "views/inbox.py", "views/help.py", "views/terms.py"]
 
 
@@ -251,3 +251,30 @@ def test_welcome_script_survives_the_html_sanitiser():
     from demandino import landing
     assert not re.search(r"<[/\\w!]", landing.JS_BODY)  # Streamlit removes a whole script if it holds anything like a tag
     assert "__ICONS__" not in landing.JS
+
+
+def test_removed_and_renamed_products_flow_through_the_whole_app():
+    import secrets as _s
+
+    from demandino import db
+    uid = db.create_user("p" + _s.token_hex(4), "a very long password")
+    at = _new_app()
+    at.session_state["user_id"] = uid
+    at.run()
+    at.switch_page("views/planning.py").run()  # leaves a stock table that still lists every product
+    A = at.session_state["_app"]
+    db.set_setting(uid, f"targets:{A.base_key}", [
+        {"label": "Gone", "products": ["P002"], "start": "2020-01-01", "end": "2020-02-01", "metric": "units", "target": 5.0},
+        {"label": "Part", "products": ["P001", "P002"], "start": "2020-01-01", "end": "2020-02-01", "metric": "units", "target": 5.0}])
+    db.set_setting(uid, "catalog:sample", {"changes": {"P001": {"name": "Renamed Earbuds"}}, "removed": ["P002"]})
+    del at.session_state["catalog:sample"]  # read the saved changes again
+    for page in ("views/products.py", "views/home.py", "views/planning.py", "views/budget.py", "views/clearance.py",
+                 "views/targets.py", "views/inbox.py", "views/lifecycle.py", "views/whatif.py", "views/forecast.py"):
+        at.switch_page(page).run()
+        assert not at.exception, (page, at.exception)
+        assert "P002" not in set(at.session_state["_app"].sales["product_id"])
+    assert "-cat" in at.session_state["_app"].data_key and "-cat" not in at.session_state["_app"].settings_key
+    at.switch_page("views/products.py").run()
+    assert "Removed products" in " ".join(s.value for s in at.subheader)
+    next(b for b in at.button if b.key == "catalog_back_P002").click().run()
+    assert "P002" in set(at.session_state["_app"].sales["product_id"])
