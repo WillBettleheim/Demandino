@@ -159,30 +159,82 @@ def generate_sample_data(end_date: str | pd.Timestamp | None = None, years: int 
     return pd.concat(frames, ignore_index=True)
 
 
+COLUMN_NAMES = {
+    "date": ("order_date", "sale_date", "sales_date", "transaction_date", "invoice_date", "created_at", "day"),
+    "product_id": ("sku", "item_id", "item", "item_code", "stockcode", "stock_code", "product_code", "code",
+                   "variant_sku", "lineitem_sku"),
+    "units_sold": ("quantity", "units", "sales", "qty", "qty_sold", "quantity_sold", "items_sold", "net_items_sold",
+                   "net_quantity", "ordered_quantity", "lineitem_quantity"),
+    "price": ("unit_price", "selling_price", "sale_price", "price_each", "avg_price", "lineitem_price"),
+    "product_name": ("product", "product_title", "item_name", "title", "name", "description", "lineitem_name"),
+    "category": ("product_type", "type", "department", "group"),
+}
+
+
+def standard_columns(raw: pd.DataFrame) -> pd.DataFrame:
+    """A copy with common export column names (Order Date, SKU, Qty…) changed to the ones used here."""
+    df = raw.copy()
+    df.columns = [str(c).strip().lower().replace(" ", "_").replace("-", "_") for c in df.columns]
+    for standard, names in COLUMN_NAMES.items():
+        if standard not in df.columns:
+            found = next((n for n in names if n in df.columns), None)
+            if found:
+                df = df.rename(columns={found: standard})
+    if "product_id" not in df.columns and "product_name" in df.columns:
+        df["product_id"] = df["product_name"]
+    return df
+
+
+def parse_dates(values: pd.Series) -> pd.Series:
+    """Dates as days. Numeric dates like 03/04/2025 are read day-first when the file shows that's its format (some first
+    number is above 12); otherwise month-first. Guessing row by row would scramble the history."""
+    if pd.api.types.is_datetime64_any_dtype(values):
+        return values.dt.normalize()
+    text = values.astype("string").str.strip()
+    parts = text.str.extract(r"^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2,4})")
+    numeric = parts[0].notna()
+    out = pd.to_datetime(text.where(~numeric), errors="coerce", format="mixed")
+    if numeric.any():
+        day_first = bool((pd.to_numeric(parts[0], errors="coerce") > 12).any())
+        year = parts[2].where(parts[2].str.len() == 4, "20" + parts[2])
+        day, month = (parts[0], parts[1]) if day_first else (parts[1], parts[0])
+        got = pd.to_datetime({"year": pd.to_numeric(year), "month": pd.to_numeric(month), "day": pd.to_numeric(day)},
+                             errors="coerce")
+        out = out.where(~numeric, got)
+    return out.dt.normalize()
+
+
+def parse_numbers(values: pd.Series) -> pd.Series:
+    """Numbers, accepting what spreadsheets export: $1,234.50, 1 234, 10,50 and similar."""
+    if pd.api.types.is_numeric_dtype(values):
+        return values
+    text = values.astype("string").str.replace(r"[^\d,.\-]", "", regex=True)
+    decimal_comma = text.str.fullmatch(r"-?\d+,\d{1,2}").fillna(False)
+    text = text.where(~decimal_comma, text.str.replace(",", "."))
+    got = pd.to_numeric(text.str.replace(",", ""), errors="coerce")
+    return pd.Series(got.astype("Float64").to_numpy(dtype=float, na_value=np.nan), index=values.index)
+
+
 def prepare_sales(raw: pd.DataFrame) -> pd.DataFrame:
     """Validate and normalise a user dataset to the canonical daily schema.
 
     Missing days are filled with zero sales (price carried forward), optional columns
     are inferred, and duplicate rows per product/day are aggregated.
     """
-    df = raw.copy()
-    df.columns = [str(c).strip().lower().replace(" ", "_") for c in df.columns]
-    aliases = {"quantity": "units_sold", "units": "units_sold", "sales": "units_sold", "qty": "units_sold",
-               "sku": "product_id", "item_id": "product_id", "product": "product_name", "unit_price": "price"}
-    df = df.rename(columns={k: v for k, v in aliases.items() if k in df.columns and v not in df.columns})
-    if "product_id" not in df.columns and "product_name" in df.columns:
-        df["product_id"] = df["product_name"]
+    df = standard_columns(raw)
     missing = [c for c in REQUIRED_COLUMNS if c not in df.columns]
     if missing:
-        raise ValueError(f"Missing required column(s): {', '.join(missing)}. "
-                         f"Required: {', '.join(REQUIRED_COLUMNS)}; optional: {', '.join(OPTIONAL_COLUMNS)}.")
+        words = {"date": "the date", "product_id": "the product", "units_sold": "how many sold", "price": "the price"}
+        found = ", ".join(str(c) for c in raw.columns[:12])
+        raise ValueError(f"Couldn't find a column for {' or '.join(words[c] for c in missing)}. Your file has: {found}. "
+                         "Rename the column (for example to date, product_id, units_sold or price) and upload it again.")
 
-    df["date"] = pd.to_datetime(df["date"], errors="coerce").dt.normalize()
-    df["units_sold"] = pd.to_numeric(df["units_sold"], errors="coerce")
-    df["price"] = pd.to_numeric(df["price"], errors="coerce")
+    df["date"] = parse_dates(df["date"])
+    df["units_sold"] = parse_numbers(df["units_sold"])
+    df["price"] = parse_numbers(df["price"])
     df = df.dropna(subset=["date", "units_sold", "price"])
     if df.empty:
-        raise ValueError("No valid rows after parsing dates, units and prices.")
+        raise ValueError("Couldn't read any rows: check that the date, units and price columns hold dates and numbers.")
     df["product_id"] = df["product_id"].astype(str)
     if "product_name" not in df.columns:
         df["product_name"] = df["product_id"]

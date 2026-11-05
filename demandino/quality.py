@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
-from .data import generate_sample_data, prepare_sales
+from .data import generate_sample_data, parse_dates, parse_numbers, prepare_sales, standard_columns
 from .model import MIN_TRAIN_DAYS
 
 LONG_GAP = 7          # missing days in a row that look like "no data" (or no stock) rather than no sales
@@ -36,19 +36,13 @@ class Issue:
 
 def _normalise(raw: pd.DataFrame) -> pd.DataFrame:
     """Column names and types as prepare_sales sees them, without dropping or merging anything."""
-    df = raw.copy()
-    df.columns = [str(c).strip().lower().replace(" ", "_") for c in df.columns]
-    aliases = {"quantity": "units_sold", "units": "units_sold", "sales": "units_sold", "qty": "units_sold",
-               "sku": "product_id", "item_id": "product_id", "product": "product_name", "unit_price": "price"}
-    df = df.rename(columns={k: v for k, v in aliases.items() if k in df.columns and v not in df.columns})
-    if "product_id" not in df.columns and "product_name" in df.columns:
-        df["product_id"] = df["product_name"]
+    df = standard_columns(raw)
     for col in ("date", "product_id", "units_sold", "price"):
         if col not in df.columns:
             return df  # prepare_sales reports the missing column clearly
-    df["_date"] = pd.to_datetime(df["date"], errors="coerce").dt.normalize()
-    df["_units"] = pd.to_numeric(df["units_sold"], errors="coerce")
-    df["_price"] = pd.to_numeric(df["price"], errors="coerce")
+    df["_date"] = parse_dates(df["date"])
+    df["_units"] = parse_numbers(df["units_sold"])
+    df["_price"] = parse_numbers(df["price"])
     df["product_id"] = df["product_id"].astype(str)
     return df
 
