@@ -46,7 +46,7 @@ chat_key = f"chat::{r.inputs.name}::{r.inputs.start:%Y%m%d}::{r.inputs.horizon}"
 history = st.session_state.setdefault(chat_key, [])
 for m in history:
     with st.chat_message(m["role"], avatar=":material/person:" if m["role"] == "user" else ":material/auto_awesome:"):
-        st.markdown(m["content"])
+        st.markdown(m["content"] if m["role"] == "assistant" else ui.md_safe(m["content"]))
 
 suggest = None
 if not history:
@@ -57,12 +57,15 @@ question = st.chat_input("Ask about this forecast…", max_chars=assistant.MAX_Q
 if question:
     if len(history) >= 2 * assistant.MAX_TURNS * 2:
         st.warning("This conversation is long — clear it to start fresh.")
+    elif assistant.uses_server_key() and not assistant.server_key_allowed(st.session_state):
+        st.warning("The assistant has answered a lot of questions recently. Please try again later.",
+                   icon=":material/hourglass_top:")
     else:
         with st.chat_message("user", avatar=":material/person:"):
-            st.markdown(question)
+            st.markdown(ui.md_safe(question))
         summary = assistant.forecast_summary(r, ui.currency(), A.backtest["metrics"])
         with st.chat_message("assistant", avatar=":material/auto_awesome:"):
-            answer = st.write_stream(assistant.ask(assistant.client_for(key), summary, history, question))
+            answer = st.write_stream(assistant.safe_stream(assistant.ask(assistant.client_for(key), summary, history, question)))
         history += [{"role": "user", "content": question}, {"role": "assistant", "content": str(answer)}]
 if history and st.button("Clear conversation", icon=":material/delete_sweep:"):
     st.session_state[chat_key] = []

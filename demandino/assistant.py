@@ -7,6 +7,10 @@ server-side refusal fallback.
 from __future__ import annotations
 
 import json
+import os
+import re
+import threading
+import time
 from collections.abc import Iterator
 
 import anthropic
@@ -16,6 +20,15 @@ import pandas as pd
 MODEL = "claude-opus-5-5"
 MAX_QUESTION = 2000
 MAX_TURNS = 12
+# The server's own key is shared by every visitor, so its bill needs limits.
+SERVER_KEY_PER_SESSION_HOUR = 20
+SERVER_KEY_PER_DAY = 300
+_usage_lock = threading.Lock()
+_usage = {"day": "", "count": 0}
+_IMAGE = re.compile(r"!\[[^\]]*\]\s*(\([^)]*\)|\[[^\]]*\])?")
+_LINK = re.compile(r"\[([^\]]*)\]\s*\([^)]*\)")
+_LINK_DEFINITION = re.compile(r"(?m)^\s*\[[^\]]+\]:\s*\S+.*$")
+_AUTOLINK = re.compile(r"<(https?://[^>\s]*)>")
 
 SYSTEM = """You are Demandino's forecasting assistant. You help a shop owner understand a demand forecast and
 decide what to do (pricing, promotions, stock, ordering).
@@ -80,6 +93,46 @@ def forecast_summary(r, currency: str, accuracy: dict | None = None) -> dict:
     return out
 
 
+def clean_reply(text: str) -> str:
+    """Remove images and links from an answer. Product names come from uploaded files and could try to steer the model;
+    an image would make the browser send data to any address, and a link could lead anywhere."""
+    text = _LINK_DEFINITION.sub("", _IMAGE.sub("", text))
+    return _AUTOLINK.sub(r"\1", _LINK.sub(r"\1", text))
+
+
+def safe_stream(chunks: Iterator[str]) -> Iterator[str]:
+    """An answer as it arrives, a line at a time, so nothing unsafe can be shown before it's complete enough to spot."""
+    buffer = ""
+    for chunk in chunks:
+        buffer += chunk
+        if "\n" in buffer:
+            done, buffer = buffer.rsplit("\n", 1)
+            yield clean_reply(done + "\n")
+    if buffer:
+        yield clean_reply(buffer)
+
+
+def server_key_allowed(state) -> bool:
+    """Count a question against the limits for the server's own key; False once they're reached."""
+    now = time.time()
+    recent = [t for t in state.get("_assistant_times", []) if t > now - 3600]
+    if len(recent) >= SERVER_KEY_PER_SESSION_HOUR:
+        return False
+    with _usage_lock:
+        today = time.strftime("%Y-%m-%d")
+        if _usage["day"] != today:
+            _usage.update(day=today, count=0)
+        if _usage["count"] >= SERVER_KEY_PER_DAY:
+            return False
+        _usage["count"] += 1
+    state["_assistant_times"] = recent + [now]
+    return True
+
+
+def uses_server_key() -> bool:
+    return bool(os.environ.get("ANTHROPIC_API_KEY"))
+
+
 def client_for(api_key: str | None) -> anthropic.Anthropic:
     return anthropic.Anthropic(api_key=api_key) if api_key else anthropic.Anthropic()
 
@@ -88,7 +141,7 @@ def ask(client: anthropic.Anthropic, summary: dict, history: list[dict], questio
     """Stream the answer text. `history` holds earlier {"role", "content"} text turns."""
     question = question.strip()[:MAX_QUESTION]
     system = [{"type": "text", "text": SYSTEM},
-              {"type": "text", "text": "<forecast_data>\n" + json.dumps(summary, default=str) + "\n</forecast_data>",
+              {"type": "text", "text": "<forecast_data>\n" + json.dumps(summary, default=str).replace("<", "\\u003c") + "\n</forecast_data>",
                "cache_control": {"type": "ephemeral"}}]
     messages = [m for m in history[-2 * MAX_TURNS:] if m["role"] in ("user", "assistant")]
     messages.append({"role": "user", "content": question})
