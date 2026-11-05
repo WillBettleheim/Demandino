@@ -28,11 +28,24 @@ Measures built into Demandino:
 | Files on disk | Data and cache folders are private to the account running the app; cache files never include uploaded outside factors, and old ones are removed | `demandino/security.py`, `demandino/state.py` |
 | Large order files | Order lines are held in a sparse matrix, so a big upload can't exhaust memory | `demandino/baskets.py` |
 | Committed secrets | `scripts/security_check.py` scans tracked files (and git history with `--history`), checks ignored and private files and protective settings; the test suite runs it too | `scripts/security_check.py` |
+| Requests to private networks | Store and email addresses are checked when connecting, not only when typed, so no name or number format can reach this server's own network or cloud metadata. Connections go only to the address just checked | `demandino/integrations.py` |
+| Stolen keys in transit | A key never follows a redirect to another site or to plain http, and a Shopify token only goes to that store | `demandino/integrations.py` |
+| Hostile uploads | Refused before any processing if they hold too many products, centuries of dates or too many product-days. Impossible values are dropped, and file contents never appear in messages. Angle brackets are removed from every name | `demandino/security.py`, `demandino/data.py` |
+| Overloading the server | At most 2 models train at once and one session can start 20 an hour. One import is capped at 200 MB and 2 million rows | `demandino/state.py`, `demandino/integrations.py` |
+| Filling the disk | Only the unmodified built-in data is cached to disk, and for at most 7 days. Each account has limits on datasets, scenarios, share links and orders. New accounts are limited to 5 per address and 50 overall every 15 minutes | `demandino/state.py`, `demandino/db.py` |
+| Open tabs after sign-out | A tab stops working within seconds of "sign out everywhere", a password change or account deletion. Deleting an account needs the password | `demandino/account.py`, `views/workspace.py` |
+| Steering the AI assistant | Product names are passed as data, and images and links are removed from answers, so a poisoned name can't send data elsewhere. The server's own key is limited to 20 questions an hour per session and 300 a day | `demandino/assistant.py` |
+| Losing data | `scripts/backup.py` makes a private, integrity-checked copy of the database, safe to run while the app is running | `scripts/backup.py` |
+| Vulnerable or tampered code | Dependabot proposes updates; checks run on every push with read-only permissions | `.github/` |
 
 Known limits:
 
 - The sign-in cookie is set from the page, so it can't be `HttpOnly`: Streamlit gives apps no way to set response
   headers. Escaping all file text is what protects it. Sessions last 14 days and can be ended from the Security page.
+- One person can lock an account for 15 minutes by failing to sign in to it on purpose. That's the cost of stopping
+  password guessing. A "username taken" message also reveals that a username exists.
+- Limits on training and the assistant apply per session or per server process. Limiting requests per address and
+  stopping floods of traffic has to be done in front of the app (a reverse proxy or a service such as Cloudflare).
 - Saved datasets are compressed but not encrypted in `.data/demandino.db`, which is readable only by the account
   running the app. Use disk encryption on the server if they are sensitive.
 
@@ -46,6 +59,11 @@ Recommendations when you deploy:
 - Have the reverse proxy add security headers (`Strict-Transport-Security`, `Content-Security-Policy`,
   `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`) and pass the real client address, so the
   per-address sign-in limit counts visitors rather than the proxy.
-- Run `python scripts/security_check.py --history` before each deploy.
+- Run `python scripts/security_check.py --history --deps` before each deploy, and `python scripts/backup.py` on a
+  daily schedule, keeping a copy off the server.
+- Run the app as its own unprivileged user. If it's in a container, don't run as root.
+- Block outgoing connections from the server to its private network and cloud metadata address as a second layer.
+- Don't set `ANTHROPIC_API_KEY` on a public server unless you also set a spending limit on that key.
+- On GitHub: turn on two-factor authentication, secret scanning and push protection, and protect the `main` branch.
 
 Report a vulnerability privately to the repository owner rather than in a public issue.
