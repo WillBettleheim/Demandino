@@ -57,7 +57,7 @@ with left:
             hist = A.history(pid)
             name, category = hist["product_name"].iloc[0], hist["category"].iloc[0]
             default_price = float(hist["regular_price"].iloc[-1])
-            st.caption(f"{category} · {len(hist):,} days of history · last price {ui.money(default_price, 2)}")
+            st.caption(f"{ui.md_safe(category)} · {len(hist):,} days of history · last price {ui.money(default_price, 2)}")
             key_sfx = pid
         else:
             pid = None
@@ -263,8 +263,11 @@ with right:
             if st.button("Save", type="primary", icon=":material/save:", disabled=not sname):
                 st.session_state.setdefault("scenarios", {})[sname] = r
                 if to_ws and A.user_id is not None:
-                    db.save_scenario(A.user_id, sname, inputs_to_json(inputs),
-                                     {"units": r.total, "profit": r.profit, "revenue": r.revenue})
+                    try:
+                        db.save_scenario(A.user_id, sname, inputs_to_json(inputs),
+                                         {"units": r.total, "profit": r.profit, "revenue": r.revenue})
+                    except db.AuthError as exc:
+                        st.error(str(exc))
                 st.toast(f"Saved “{sname}” — compare it in the Scenarios tab.", icon=":material/bookmark:")
 
     rows = details.checklist(inputs, default_price, round(default_price * 0.55, 2))
@@ -549,11 +552,15 @@ with right:
                 db.log_forecast(A.user_id, A.data_key, inputs.pid or f"new:{inputs.name}", inputs.name, payload)
                 st.toast("Tracking — see the Forecast tracking page.", icon=":material/check:")
             if st.button("Create a share link (valid 7 days)", icon=":material/link:"):
-                token = db.create_share(A.user_id, f"{inputs.name} · {inputs.horizon}-day forecast",
-                                        {"summary": assistant.forecast_summary(r, ui.currency()),
-                                         "currency": ui.currency()})
-                base = str(st.context.url).split("?")[0].rsplit("/", 1)[0] if st.context.url else ""
-                st.code(f"{base}/?share={token}", language=None)
+                try:
+                    token = db.create_share(A.user_id, f"{inputs.name} · {inputs.horizon}-day forecast",
+                                            {"summary": assistant.forecast_summary(r, ui.currency()),
+                                             "currency": ui.currency()})
+                except db.AuthError as exc:
+                    st.error(str(exc))
+                else:
+                    base = str(st.context.url).split("?")[0].rsplit("/", 1)[0] if st.context.url else ""
+                    st.code(f"{base}/?share={token}", language=None)
                 st.caption("Anyone with this link can view a read-only summary. Revoke it on the Workspace page.")
         else:
             st.caption("Sign in to track this forecast against real sales or create a share link.")

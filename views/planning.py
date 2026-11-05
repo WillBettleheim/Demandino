@@ -213,8 +213,11 @@ c2.download_button("Full plan (CSV)", safe_csv(plan.drop(columns=["trend"])), "d
                    "text/csv", icon=":material/download:", width="stretch")
 if uid:
     if c3.button("Send purchase list for approval", icon=":material/approval:", width="stretch", disabled=po.empty):
-        db.create_po(uid, po.to_dict(orient="records"), note=f"{len(po)} lines · {ui.money(po['order_cost'].sum())}")
-        st.toast("Draft purchase order created — approve it on the Purchase orders page.", icon=":material/check:")
+        try:
+            db.create_po(uid, po.to_dict(orient="records"), note=f"{len(po)} lines · {ui.money(po['order_cost'].sum())}")
+            st.toast("Draft purchase order created — approve it on the Purchase orders page.", icon=":material/check:")
+        except db.AuthError as exc:
+            st.error(str(exc))
 else:
     c3.button("Sign in to send for approval", disabled=True, width="stretch", icon=":material/lock:")
 

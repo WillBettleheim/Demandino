@@ -33,6 +33,15 @@ LOCK_MINUTES = 15
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_.-]{3,32}$")
 MIN_PASSWORD = 10
 MAX_DATASET_MB = 30
+# What one account can store, so nobody can fill the server's disk.
+MAX_DATASETS = 10
+MAX_SCENARIOS = 200
+MAX_SHARES = 50
+MAX_PURCHASE_ORDERS = 2000
+MAX_SETTING_BYTES = 5 * 1024 * 1024
+MAX_SECRET_CHARS = 4000
+KEEP_FORECASTS = 2000
+KEEP_ACTIVITY = 5000
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -147,6 +156,36 @@ def record_failure(ip: str | None) -> None:
     if ip:
         with connect() as con:
             con.execute("INSERT INTO auth_failures VALUES (?,?)", (ip[:64], time.time()))
+
+
+SIGNUPS_PER_ADDRESS = 5    # new accounts per IP_WINDOW
+SIGNUPS_OVERALL = 50
+
+
+def signup_blocked(ip: str | None) -> bool:
+    """Each new account costs real work and storage, so a script can't create thousands of them."""
+    with connect() as con:
+        con.execute("DELETE FROM auth_failures WHERE at < ?", (time.time() - IP_WINDOW,))
+        count = lambda who: con.execute("SELECT COUNT(*) AS n FROM auth_failures WHERE ip = ?", (who,)).fetchone()["n"]
+        return count("signup:*") >= SIGNUPS_OVERALL or bool(ip and count(f"signup:{ip}"[:64]) >= SIGNUPS_PER_ADDRESS)
+
+
+def record_signup(ip: str | None) -> None:
+    with connect() as con:
+        con.execute("INSERT INTO auth_failures VALUES (?,?)", ("signup:*", time.time()))
+        if ip:
+            con.execute("INSERT INTO auth_failures VALUES (?,?)", (f"signup:{ip}"[:64], time.time()))
+
+
+def _within(con, table: str, user_id: int, limit: int, what: str) -> None:
+    n = con.execute(f"SELECT COUNT(*) AS n FROM {table} WHERE user_id = ?", (user_id,)).fetchone()["n"]  # noqa: S608 - fixed names
+    if n >= limit:
+        raise AuthError(f"You've reached the limit of {limit} {what}. Delete some first.")
+
+
+def _keep_latest(con, table: str, user_id: int, keep: int) -> None:
+    con.execute(f"DELETE FROM {table} WHERE user_id = ? AND id NOT IN "  # noqa: S608 - fixed names
+                f"(SELECT id FROM {table} WHERE user_id = ? ORDER BY id DESC LIMIT ?)", (user_id, user_id, keep))
 
 
 # --------------------------------------------------------------- accounts
@@ -273,6 +312,7 @@ def save_dataset(user_id: int, name: str, sales: pd.DataFrame, source: str) -> i
     if len(blob) > MAX_DATASET_MB * 1024 * 1024:
         raise AuthError(f"Dataset is larger than {MAX_DATASET_MB} MB after compression.")
     with connect() as con:
+        _within(con, "datasets", user_id, MAX_DATASETS, "saved datasets")
         cur = con.execute("INSERT INTO datasets(user_id, name, source, created, data, rows, products) "
                           "VALUES (?,?,?,?,?,?,?)", (user_id, name[:80], source[:40], time.time(), blob, len(sales),
                                                      int(sales["product_id"].nunique())))
@@ -304,6 +344,7 @@ def delete_dataset(user_id: int, dataset_id: int) -> None:
 # ------------------------------------------------------ scenarios & settings
 def save_scenario(user_id: int, name: str, inputs: dict, summary: dict) -> None:
     with connect() as con:
+        _within(con, "scenarios", user_id, MAX_SCENARIOS, "saved scenarios")
         con.execute("INSERT INTO scenarios(user_id, name, created, inputs, summary) VALUES (?,?,?,?,?)",
                     (user_id, name[:80], time.time(), json.dumps(inputs), json.dumps(summary)))
     log_activity(user_id, "Scenarios", f"Saved scenario: {name[:80]}")
@@ -328,9 +369,12 @@ LOGGED_SETTINGS = {"stock:": ("Stock", "Stock table saved"), "targets:": ("Targe
 
 
 def set_setting(user_id: int, key: str, value) -> None:
+    text = json.dumps(value)
+    if len(text) > MAX_SETTING_BYTES:
+        raise AuthError("That's too much to save at once.")
     with connect() as con:
         con.execute("INSERT INTO settings VALUES (?,?,?) ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value",
-                    (user_id, key, json.dumps(value)))
+                    (user_id, key, text))
     for prefix, (kind, detail) in LOGGED_SETTINGS.items():
         if key.startswith(prefix):
             log_activity(user_id, kind, detail)
@@ -340,6 +384,7 @@ def log_activity(user_id: int, kind: str, detail: str) -> None:
     with connect() as con:
         con.execute("INSERT INTO activity(user_id, at, kind, detail) VALUES (?,?,?,?)",
                     (user_id, time.time(), kind[:30], detail[:300]))
+        _keep_latest(con, "activity", user_id, KEEP_ACTIVITY)
 
 
 def list_activity(user_id: int, limit: int = 500) -> list[dict]:
@@ -356,6 +401,8 @@ def get_setting(user_id: int, key: str, default=None):
 
 
 def set_secret(user_id: int, key: str, value: str) -> None:
+    if len(value) > MAX_SECRET_CHARS:
+        raise AuthError("That key is too long.")
     token = _fernet().encrypt(value.encode())
     with connect() as con:
         con.execute("INSERT INTO secrets VALUES (?,?,?) ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value",
@@ -392,6 +439,7 @@ def log_forecast(user_id: int, data_key: str, product_id: str, product_name: str
         con.execute("INSERT INTO forecast_log(user_id, data_key, product_id, product_name, created, payload) "
                     "VALUES (?,?,?,?,?,?)", (user_id, data_key, product_id, product_name[:80], time.time(),
                                              json.dumps(payload)))
+        _keep_latest(con, "forecast_log", user_id, KEEP_FORECASTS)
 
 
 def list_forecasts(user_id: int) -> list[dict]:
@@ -411,6 +459,9 @@ def create_share(user_id: int, title: str, payload: dict, days: int = 7) -> str:
     token = secrets.token_urlsafe(24)
     with connect() as con:
         con.execute("DELETE FROM shares WHERE expires < ?", (time.time(),))
+        n = con.execute("SELECT COUNT(*) AS n FROM shares WHERE user_id = ?", (user_id,)).fetchone()["n"]
+        if n >= MAX_SHARES:
+            raise AuthError(f"You've reached the limit of {MAX_SHARES} share links. Revoke some first.")
         con.execute("INSERT INTO shares VALUES (?,?,?,?,?,?)", (_token_hash(token), user_id, time.time(),
                                                                 time.time() + days * 86400, title[:120],
                                                                 json.dumps(payload)))
@@ -441,6 +492,7 @@ def revoke_share(user_id: int, token_hash: str) -> None:
 # -------------------------------------------------------- purchase orders
 def create_po(user_id: int, lines: list[dict], note: str = "") -> int:
     with connect() as con:
+        _within(con, "purchase_orders", user_id, MAX_PURCHASE_ORDERS, "purchase orders")
         cur = con.execute("INSERT INTO purchase_orders(user_id, created, status, note, lines) VALUES (?,?,?,?,?)",
                           (user_id, time.time(), "Draft", note[:300], json.dumps(lines, default=str)))
         po_id = int(cur.lastrowid)
