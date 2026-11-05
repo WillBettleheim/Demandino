@@ -13,6 +13,7 @@ import pandas as pd
 
 from .data import generate_sample_data, parse_dates, parse_numbers, prepare_sales, standard_columns
 from .model import MIN_TRAIN_DAYS
+from .security import check_product_count
 
 LONG_GAP = 7          # missing days in a row that look like "no data" (or no stock) rather than no sales
 PRICE_FACTOR = 10     # a price this many times above/below the product's usual price is suspicious
@@ -44,6 +45,7 @@ def _normalise(raw: pd.DataFrame) -> pd.DataFrame:
     df["_units"] = parse_numbers(df["units_sold"])
     df["_price"] = parse_numbers(df["price"])
     df["product_id"] = df["product_id"].astype(str)
+    check_product_count(df)  # before anything loops over products; a mistyped year is left for the check to report
     return df
 
 

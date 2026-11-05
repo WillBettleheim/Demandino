@@ -5,8 +5,12 @@ Canonical daily schema (one row per product per day):
 """
 from __future__ import annotations
 
+import re
+
 import numpy as np
 import pandas as pd
+
+from .security import MAX_VALUE, check_history_size
 
 REQUIRED_COLUMNS = ["date", "product_id", "units_sold", "price"]
 OPTIONAL_COLUMNS = ["product_name", "category", "regular_price", "promo"]
@@ -225,7 +229,7 @@ def prepare_sales(raw: pd.DataFrame) -> pd.DataFrame:
     missing = [c for c in REQUIRED_COLUMNS if c not in df.columns]
     if missing:
         words = {"date": "the date", "product_id": "the product", "units_sold": "how many sold", "price": "the price"}
-        found = ", ".join(str(c) for c in raw.columns[:12])
+        found = re.sub(r"[^\w ,.-]", "", ", ".join(str(c)[:30] for c in raw.columns[:12]))  # file text shown in a message
         raise ValueError(f"Couldn't find a column for {' or '.join(words[c] for c in missing)}. Your file has: {found}. "
                          "Rename the column (for example to date, product_id, units_sold or price) and upload it again.")
 
@@ -233,9 +237,11 @@ def prepare_sales(raw: pd.DataFrame) -> pd.DataFrame:
     df["units_sold"] = parse_numbers(df["units_sold"])
     df["price"] = parse_numbers(df["price"])
     df = df.dropna(subset=["date", "units_sold", "price"])
+    df = df[(df["units_sold"].abs() <= MAX_VALUE) & df["price"].between(0, MAX_VALUE)]  # also drops infinity
     if df.empty:
         raise ValueError("Couldn't read any rows: check that the date, units and price columns hold dates and numbers.")
     df["product_id"] = df["product_id"].astype(str)
+    check_history_size(df)
     if "product_name" not in df.columns:
         df["product_name"] = df["product_id"]
     if "category" not in df.columns:
@@ -243,7 +249,8 @@ def prepare_sales(raw: pd.DataFrame) -> pd.DataFrame:
     df["category"] = df["category"].fillna("General").astype(str)
     # Names come from user files: strip control characters and cap the length.
     for col in ("product_id", "product_name", "category"):
-        df[col] = df[col].astype(str).str.replace(r"[\x00-\x1f\x7f]", "", regex=True).str.strip().str[:80]
+        df[col] = (df[col].astype(str).str.replace(r"[\x00-\x1f\x7f<>]", "", regex=True)
+                   .str.replace(r"!\[|\]\(", " ", regex=True).str.strip().str[:80])  # never markup, images or links
 
     agg = {"units_sold": "sum", "price": "mean", "product_name": "first", "category": "first"}
     for col in ("regular_price", "promo"):

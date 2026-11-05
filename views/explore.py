@@ -40,7 +40,7 @@ if not np.isnan(prof["elasticity"]):
 if not np.isnan(prof["cv"]):
     vol = "very volatile" if prof["cv"] > 0.8 else "moderately volatile" if prof["cv"] > 0.4 else "stable"
     lines.append(f"Daily demand is **{vol}** (coefficient of variation {prof['cv']:.2f}).")
-findings(lines, f"What the history says about {name}")
+findings(lines, f"What the history says about {ui.md_safe(name)}")
 
 show_patterns(g, prof, name)
 
@@ -58,7 +58,7 @@ table = pd.DataFrame({"date": full["date"].to_numpy()[cand], "units_sold": full[
                       "normal": normal[cand].round(1)})
 table["one_off"] = [((pid, d) not in keep) for d in day_str[cand]]
 if table.empty:
-    st.success(f"No one-off bulk orders found for {name}.", icon=":material/check_circle:")
+    st.success(f"No one-off bulk orders found for {ui.md_safe(name)}.", icon=":material/check_circle:")
 edited = st.data_editor(table, key=f"bulk_{A.base_key}_{pid}", hide_index=True, width="stretch",
                         disabled=["date", "units_sold", "normal"], column_config={
                             "date": st.column_config.DateColumn("Day", format="D MMM YYYY"),

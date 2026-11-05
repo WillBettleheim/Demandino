@@ -16,10 +16,12 @@ MAX_UPLOAD_MB = 25          # also enforced by Streamlit (server.maxUploadSize)
 MAX_ROWS = 2_000_000        # rows in a sales file
 MAX_PRODUCTS = 300          # products the model will train on at once
 MAX_YEARS = 10              # span of history
+MAX_PRODUCT_DAYS = 400_000  # product-days after gaps are filled: what training's memory use depends on
+MAX_VALUE = 1e9             # the most units or the highest price a row can hold
 MAX_TEXT = 80               # product / scenario names
 
 _FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
-_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
+_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f<>]")  # angle brackets too: names must never read as HTML
 
 
 class UploadError(ValueError):
@@ -35,13 +37,31 @@ def read_csv_upload(content: bytes, max_rows: int = MAX_ROWS) -> pd.DataFrame:
         raise UploadError("This does not look like a text CSV file.")
     try:
         df = pd.read_csv(io.BytesIO(content), nrows=max_rows + 1, low_memory=False, encoding_errors="replace")
-    except (pd.errors.ParserError, UnicodeDecodeError, ValueError) as exc:
-        raise UploadError(f"Could not read the CSV: {str(exc)[:200]}") from None
+    except (pd.errors.ParserError, pd.errors.EmptyDataError, UnicodeDecodeError, ValueError, MemoryError):
+        raise UploadError("Could not read this as a CSV file. Check that it's plain text with one row per line.") from None
     if len(df) > max_rows:
         raise UploadError(f"Too many rows (limit {max_rows:,}). Aggregate to daily sales per product first.")
     if df.shape[1] > 50:
         raise UploadError("Too many columns (limit 50).")
     return df
+
+
+def check_product_count(df: pd.DataFrame) -> None:
+    products = df["product_id"].nunique()
+    if products > MAX_PRODUCTS:
+        raise UploadError(f"{products:,} products found; the limit is {MAX_PRODUCTS}. Upload your top products or a "
+                          "category at a time.")
+
+
+def check_history_size(df: pd.DataFrame) -> None:
+    """Refuse a file before its gaps are filled in: two rows centuries apart would otherwise use all the memory."""
+    check_product_count(df)
+    span = df.groupby("product_id")["date"].agg(["min", "max"])
+    longest = (span["max"] - span["min"]).dt.days
+    if longest.max() > MAX_YEARS * 366:
+        raise UploadError(f"History spans {int(longest.max()) // 365} years; the limit is {MAX_YEARS}. Check the dates.")
+    if (longest + 1).sum() > MAX_PRODUCT_DAYS:
+        raise UploadError("That's too much history for one forecast. Upload fewer products or a shorter period.")
 
 
 def check_sales_limits(sales: pd.DataFrame) -> None:
@@ -56,12 +76,12 @@ def check_sales_limits(sales: pd.DataFrame) -> None:
 
 def clean_text(value: str, max_len: int = MAX_TEXT) -> str:
     """Strip control characters and limit length of free text typed or uploaded by users."""
-    return _CONTROL.sub("", str(value)).strip()[:max_len]
+    return re.sub(r"!\[|\]\(", " ", _CONTROL.sub("", str(value))).strip()[:max_len]
 
 
 # ----------------------------------------------------------------- exports
 def _safe_cell(v):
-    if isinstance(v, str) and v.startswith(_FORMULA_START):
+    if isinstance(v, str) and v.lstrip(" \u00a0").startswith(_FORMULA_START):
         return "'" + v  # stops spreadsheet apps running it as a formula (CSV/formula injection)
     return v
 
