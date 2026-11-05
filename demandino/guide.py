@@ -46,26 +46,32 @@ def welcome() -> None:
             st.page_link("views/help.py", label="Open the full guide", icon=":material/menu_book:")
 
 
-def bottom_line(r, horizon: int) -> None:
-    """The forecast in two or three plain sentences, ending with what to do."""
+def bottom_line(r, horizon: int, example_stock: bool = False, example_cost: bool = False) -> None:
+    """The forecast in two or three plain sentences, ending with what to do. Numbers the user hasn't entered yet are
+    called examples, so a guess never reads as a fact about their shop."""
     inv, inp = r.inventory, r.inputs
+    yours = f"An example stock of {ui.num(inp.stock)} units (enter yours under Inventory)" if example_stock \
+        else f"Your {ui.num(inp.stock)} units"
     per_day = r.total / horizon
     lines = [f"Expect to sell about <b>{ui.num(r.total)} units</b> in the next {horizon} days "
              f"(roughly {ui.num(per_day, 1 if per_day < 10 else 0)} a day). It will most likely land between "
              f"{ui.num(r.low)} and {ui.num(r.high)}."]
     if r.revenue:
+        guess = f", if each costs you about {ui.money(inp.cost, 2)} (a guess until you enter your unit cost)" if example_cost \
+            else ""
         lines.append(f"That's about <b>{ui.money(r.revenue)}</b> in sales and <b>{ui.money(r.profit)}</b> profit "
-                     f"at {ui.money(inp.price, 2)} each.")
+                     f"at {ui.money(inp.price, 2)} each{guess}.")
     if inv["needs_order_now"]:
-        action = f"Order about <b>{ui.num(inv['order_qty'])} units now</b> — stock is already at the reorder point."
+        low = f"{yours} would already be too few" if example_stock else "Stock is already low enough to reorder"
+        action = f"{low}: order about <b>{ui.num(inv['order_qty'])} units now</b>."
         tone = "warn"
     elif inv["reorder_by"] is not None:
-        runs_out = (f"Your {ui.num(inp.stock)} units run out around {inv['stockout_date']:%d %b}. "
+        runs_out = (f"{yours} would run out around {inv['stockout_date']:%d %b}. "
                     if inv["stockout_date"] is not None else "")
         action = f"{runs_out}Order about <b>{ui.num(inv['order_qty'])} units by {inv['reorder_by']:%d %b}</b>."
         tone = "warn"
     else:
-        action = f"Your {ui.num(inp.stock)} units in stock cover this period — <b>no order needed</b>."
+        action = f"{yours} would cover this period, so <b>no order is needed</b>."
         tone = "good"
     lines.append(action)
     st.html(f'<div class="dm-bottom {tone}"><div class="dm-bottom-label">In short</div>'
@@ -76,10 +82,10 @@ GLOSSARY = {
     "Forecast": "Our best estimate of how many units will sell. It is an average expectation, not a promise.",
     "Range (95%)": "The span real sales should fall inside 95 days out of 100. Plan for the low end when cash is "
                    "tight and for the high end when running out is expensive.",
-    "Horizon": "How many days ahead you want to forecast. Shorter horizons are more accurate.",
-    "Lead time": "Days between placing an order with your supplier and the stock arriving on your shelf.",
+    "Forecast period": "How many days ahead you want to forecast. Shorter periods are more accurate.",
+    "Delivery time": "Days between placing an order with your supplier and the stock arriving on your shelf.",
     "Days between orders": "How often you usually place orders (for example every 14 days).",
-    "Service level": "How hard to try never to run out. 95% means stock should last through 19 of every 20 "
+    "Avoid running out": "How hard to try never to run out. 95% means stock should last through 19 of every 20 "
                      "order cycles. Higher means more safety stock and more cash tied up.",
     "Safety stock": "Extra units kept on hand to cover days when demand is higher than expected.",
     "Reorder point": "When stock falls to this number, it's time to place the next order.",

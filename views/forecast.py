@@ -20,6 +20,7 @@ from demandino.scenario import (BASES, PROMO_KINDS, ForecastInputs, ScenarioResu
 from demandino.state import app
 
 A = app()
+EXAMPLE_STOCK = 500  # shown until the user enters their own, and called an example wherever it's used
 fc = A.fc
 
 
@@ -86,7 +87,7 @@ with left:
             key_sfx = f"{category}"
 
     with ui.card("price"):
-        st.markdown("**:material/sell: Price & horizon**")
+        st.markdown("**:material/sell: Price & period**")
         c1, c2 = st.columns(2)
         price = c1.number_input(f"Regular price ({ui.currency()}) *", min_value=0.01, value=round(default_price, 2),
                                 max_value=1_000_000.0, step=1.0, key=f"fc_price_{key_sfx}",
@@ -96,8 +97,8 @@ with left:
                                help="Required for profit and pricing advice. The default (55% of price) is a guess.")
         st.caption(f"Margin {(1 - cost / price) * 100:.0f}%" + (
             f" · price {price / default_price - 1:+.0%} vs current" if not new and abs(price / default_price - 1) > 0.005 else ""))
-        horizon = st.select_slider("Horizon (days)", [14, 28, 30, 45, 60, 90, 120, 150, 180], value=90, key="fc_h",
-                                   help="How far ahead to forecast. Shorter horizons are more accurate.")
+        horizon = st.select_slider("Forecast the next (days)", [14, 28, 30, 45, 60, 90, 120, 150, 180], value=90, key="fc_h",
+                                   help="How far ahead to forecast. Shorter periods are more accurate.")
         start = pd.Timestamp(st.date_input("Start date", A.last_date + pd.Timedelta(days=1),
                                            min_value=A.last_date + pd.Timedelta(days=1),
                                            max_value=A.last_date + pd.Timedelta(days=60), key="fc_start",
@@ -135,13 +136,13 @@ with left:
     with ui.card("inventory"):
         st.markdown("**:material/warehouse: Inventory**")
         c1, c2 = st.columns(2)
-        stock = c1.number_input("Units in stock", 0, 10_000_000, 500, 10, key="fc_stock",
+        stock = c1.number_input("Units in stock", 0, 10_000_000, EXAMPLE_STOCK, 10, key="fc_stock",
                                 help="How many you have on hand today. Used for the reorder advice.")
-        lead = c2.number_input("Lead time (days)", 1, 180, 14, key="fc_lead",
+        lead = c2.number_input("Delivery time (days)", 1, 180, 14, key="fc_lead",
                                help="Days from placing an order with your supplier until it arrives.")
         review = c1.number_input("Days between orders", 1, 90, 14, key="fc_review",
                                  help="How often you usually place orders, e.g. every 14 days.")
-        service = c2.number_input("Service level %", 80.0, 99.9, 95.0, 0.5, key="fc_service",
+        service = c2.number_input("Avoid running out (%)", 80.0, 99.9, 95.0, 0.5, key="fc_service",
                                   help="How hard to try never to run out. 95% = stock lasts through 19 of every "
                                        "20 order cycles. Higher keeps more spare stock.") / 100
 
@@ -207,25 +208,28 @@ with right:
     per_day = r.total / horizon
     vs_recent = (f" · <b>{(per_day / r.recent_daily - 1) * 100:+.0f}%</b> vs the last 8 weeks"
                  if r.recent_daily else "")
-    stock_chip = ((f"Stock runs out {inv['stockout_date']:%d %b} · {inv['days_of_cover']} days", "bad")
-                  if inv["stockout_date"] is not None else ("Stock covers the horizon", "good"))
+    example_stock = float(r.inputs.stock) == EXAMPLE_STOCK
+    example_cost = abs(r.inputs.cost - round(r.inputs.price * 0.55, 2)) < 0.005
+    owner = "Example stock" if example_stock else "Stock"
+    stock_chip = ((f"{owner} runs out {inv['stockout_date']:%d %b} · {inv['days_of_cover']} days",
+                   "warn" if example_stock else "bad") if inv["stockout_date"] is not None
+                  else (f"{owner} covers this period", "" if example_stock else "good"))
     # How well the model forecast this very product over the held-out test period (all products for new ones).
     pp = A.backtest["per_product"].set_index("product_id")
     if r.inputs.pid in pp.index:
         row = pp.loc[r.inputs.pid]
         off = row["total_error_%"]
-        track = (f"Track record: {row['miss_rate']:.0%} of test days outside the range · 90-day total "
-                 f"{'within' if abs(off) < 0.5 else 'off by'} {abs(off):.0f}%".replace("within 0%", "spot on"),
+        track = (f"Tested on past sales: its total was off by {abs(off):.0f}%",
                  "good" if row["miss_rate"] <= 0.07 and abs(off) <= 15 else "warn")
     else:
-        track = (f"In testing, {A.backtest['metrics']['Daily miss rate']:.1%} of real days fell outside the range", "acc")
+        track = (f"Tested on past sales: {1 - A.backtest['metrics']['Daily miss rate']:.0%} of days landed inside the range", "acc")
     ui.spotlight(
         f"{r.inputs.name} · next {horizon} days from {start:%d %b %Y}", ui.num(r.total), "units expected",
         f"{RANGE_LABEL} range <b>{ui.num(r.low)} – {ui.num(r.high)}</b> · {ui.num(per_day, 1)} per day{vs_recent}",
         [(f"{r.confidence} confidence", conf_cls), (r.inputs.category, ""), stock_chip]
         + ([(f"{dtype} demand", "warn" if dtype in ("Intermittent", "Lumpy") else "")] if dtype else []) + [track],
         count=(r.total, "fc_total", 0))
-    guide.bottom_line(r, horizon)
+    guide.bottom_line(r, horizon, example_stock, example_cost)
 
     days = r.frame().set_index("date")
     weekly = days["forecast"].resample("W").sum()
@@ -331,7 +335,7 @@ with right:
         fig.update_yaxes(ticksuffix="%", range=[0, 102])
         fig.update_xaxes(title_text="Units", range=[lo_x, hi_x])
         ui.show(fig, c2)
-        c2.caption(f"Your stock of {ui.num(inputs.stock)} units covers the whole horizon's demand with about "
+        c2.caption(f"Your stock of {ui.num(inputs.stock)} units covers the whole period's demand with about "
                    f"**{cover:.0f}%** probability.")
 
     with tabs[1]:
@@ -343,12 +347,12 @@ with right:
             decreasing=dict(marker_color=ui.BAD), totals=dict(marker_color=ui.FC),
             text=[f"{v:+,.0f}" if i else f"{v:,.0f}" for i, v in enumerate(values)] + [f"{r.total:,.0f}"],
             textposition="outside", hovertemplate="%{x}: %{y:,.0f}<extra></extra>"))
-        ui.style(fig, f"From recent run-rate to the {horizon}-day forecast (units)", height=420, legend=False,
+        ui.style(fig, f"From recent pace to the {horizon}-day forecast (units)", height=420, legend=False,
                  hover="closest")
         ui.show(fig)
-        st.caption("**Recent run-rate**: the last 56 days' average × horizon. **Season, trend & calendar**: what the "
+        st.caption("**Recent pace**: the last 56 days' average × the days ahead. **Season, trend & calendar**: what the "
                    "ML model adds for time of year, momentum, weekdays and holidays. **Price change**: effect of your "
-                   f"price vs the current one (elasticity {r.elasticity:.2f}). **Promotions**, **Events** and "
+                   f"price vs the current one (price sensitivity {r.elasticity:.2f}). **Promotions**, **Events** and "
                    "**Launch ramp-up** follow your plan.")
         st.markdown("##### :material/help: Why this day?")
         day = st.select_slider("Pick a day", options=list(range(len(res.dates))), value=int(np.argmax(res.mean)),
@@ -415,7 +419,7 @@ with right:
         fig.update_xaxes(title_text=f"Regular price ({ui.currency()})")
         fig.update_yaxes(title_text=f"Profit ({ui.currency()})")
         ui.show(fig, c1)
-        c1.caption(f"Price elasticity {r.elasticity:.2f}: a 1% price rise changes units by {r.elasticity:.2f}%. "
+        c1.caption(f"Price sensitivity {r.elasticity:.2f}: a 1% price rise changes units by {r.elasticity:.2f}%. "
                    "Far from today's price the estimate is less certain.")
         with c2:
             if r.promo_effect:
@@ -455,12 +459,12 @@ with right:
     with tabs[4]:
         with st.container(horizontal=True):
             st.metric("Safety stock", ui.num(inv["safety_stock"]), border=True)
-            st.metric("Reorder point", ui.num(inv["reorder_point"]), border=True,
+            st.metric("Reorder when stock hits", ui.num(inv["reorder_point"]), border=True,
                       help="Order when stock on hand falls to this level.")
             st.metric("Order by", "Now" if inv["needs_order_now"] else
                       (f"{inv['reorder_by']:%d %b %Y}" if inv["reorder_by"] is not None else "Not needed"), border=True)
             st.metric("Order quantity", ui.num(inv["order_qty"]), border=True,
-                      help=f"Covers lead time + review period ({inputs.lead + inputs.review} days) at "
+                      help=f"Covers delivery time + days between orders ({inputs.lead + inputs.review} days) at "
                            f"{inputs.service:.1%} service, minus stock still on hand at the order date.")
         on_hand = inputs.stock - np.cumsum(res.mean)
         fig = go.Figure()
@@ -469,7 +473,7 @@ with right:
                         line=dict(color=ui.BAD, dash="dot"))
         fig.add_hrect(y0=0, y1=inv["safety_stock"], fillcolor="rgba(220,38,38,0.08)", line_width=0,
                       annotation_text="safety stock", annotation_position="top left")
-        fig.add_hline(y=inv["reorder_point"], line_dash="dash", line_color=ui.FC, annotation_text="reorder point")
+        fig.add_hline(y=inv["reorder_point"], line_dash="dash", line_color=ui.FC, annotation_text="reorder level")
         if inv["reorder_by"] is not None:
             fig.add_vline(x=inv["reorder_by"], line_dash="dot", line_color=ui.FC)
         ui.style(fig, "Projected stock if no new orders arrive", height=380)
