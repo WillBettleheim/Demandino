@@ -23,7 +23,7 @@ from .data import generate_sample_data, prepare_sales, template_csv
 from .model import MIN_CHECK_DAYS, MIN_TRAIN_DAYS, DemandForecaster, backtest
 from .security import UploadError, check_sales_limits, clean_text, dump_signed, load_signed, read_csv_upload
 
-MODEL_VERSION = 9
+MODEL_VERSION = 10
 COUNTRIES = {"None": "No public holidays", "US": "United States", "GB": "United Kingdom", "IN": "India",
              "CA": "Canada", "AU": "Australia", "DE": "Germany", "FR": "France", "ES": "Spain", "IT": "Italy",
              "NL": "Netherlands", "IE": "Ireland", "BR": "Brazil", "MX": "Mexico", "JP": "Japan", "CN": "China",
