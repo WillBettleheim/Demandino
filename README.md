@@ -7,6 +7,7 @@ change or promotion would do.
 ![Python](https://img.shields.io/badge/Python-3.14-0B1730)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.66-E8604C)
 ![scikit-learn](https://img.shields.io/badge/scikit--learn-1.9-0B1730)
+[![License: MIT](https://img.shields.io/badge/License-MIT-E8604C)](LICENSE)
 [![Checks](https://github.com/WillBettleheim/Demandino/actions/workflows/checks.yml/badge.svg)](https://github.com/WillBettleheim/Demandino/actions/workflows/checks.yml)
 
 ![The Demandino home page](docs/images/home.jpg)
@@ -137,6 +138,11 @@ Run the tests with:
 
 The real store data comes from [UCI Online Retail II](https://archive.ics.uci.edu/dataset/502/online+retail+ii)
 (CC BY 4.0). The sample shop is simulated.
+
+## License
+
+The code is released under the [MIT License](LICENSE). The real store data in `data/` keeps its own
+license, CC BY 4.0.
 
 ## Disclaimer
 
