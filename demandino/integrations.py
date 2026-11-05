@@ -7,11 +7,15 @@ stores them encrypted) and are never logged.
 from __future__ import annotations
 
 import base64
+import http.client
 import io
+import ipaddress
 import json
 import re
 import smtplib
+import socket
 import ssl
+import urllib.error
 import urllib.parse
 import urllib.request
 from email.message import EmailMessage
@@ -23,6 +27,10 @@ from .security import UploadError, check_sales_limits, read_csv_upload
 
 TIMEOUT = 30
 MAX_BYTES = 25 * 1024 * 1024
+MAX_TOTAL_BYTES = 200 * 1024 * 1024  # across all the pages of one import
+MAX_ROWS = 2_000_000
+SMTP_PORTS = (25, 465, 587, 2525)
+MAX_RECIPIENTS = 10
 SHOPIFY_DOMAIN = re.compile(r"^[a-z0-9][a-z0-9-]{0,60}\.myshopify\.com$")
 EMAIL = re.compile(r"^[^@\s]{1,64}@[A-Za-z0-9.-]{1,190}\.[A-Za-z]{2,}$")
 
@@ -34,7 +42,9 @@ class ConnectorError(ValueError):
 # ------------------------------------------------------------------ HTTP
 class _SameHostRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
-        if urllib.parse.urlparse(newurl).hostname != urllib.parse.urlparse(req.full_url).hostname:
+        new, old = urllib.parse.urlparse(newurl), urllib.parse.urlparse(req.full_url)
+        # Keys travel with the request, so they must never follow a redirect to another site or to plain http.
+        if new.hostname != old.hostname or new.scheme != "https":
             raise ConnectorError("The service redirected to a different site; refusing to follow.")
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
@@ -49,19 +59,57 @@ def _tls_context() -> ssl.SSLContext:
         return ssl.create_default_context()
 
 
-_opener = urllib.request.build_opener(_SameHostRedirect, urllib.request.HTTPSHandler(context=_tls_context()))
+def _public_addresses(host: str, port: int) -> list[str]:
+    """The addresses of a host, refusing anything private: a store address must never reach this server's own network."""
+    try:
+        infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    except (OSError, UnicodeError):
+        raise ConnectorError("Could not find that address. Check it and your connection.") from None
+    addresses = []
+    for *_, sockaddr in infos:
+        ip = ipaddress.ip_address(str(sockaddr[0]).split("%")[0])
+        ip = getattr(ip, "ipv4_mapped", None) or ip
+        if not ip.is_global or ip.is_multicast:
+            raise ConnectorError("Private or numeric addresses are not allowed.")
+        addresses.append(str(ip))
+    if not addresses:
+        raise ConnectorError("Could not find that address. Check it and your connection.")
+    return addresses
+
+
+class _PublicHTTPSConnection(http.client.HTTPSConnection):
+    """Connects only to the address it just checked, so a name can't switch to a private address afterwards."""
+
+    def connect(self) -> None:
+        error: OSError | None = None
+        for address in _public_addresses(self.host, self.port):
+            try:
+                sock = socket.create_connection((address, self.port), self.timeout)
+                self.sock = self._context.wrap_socket(sock, server_hostname=self.host)
+                return
+            except OSError as exc:
+                error = exc
+        raise error or OSError("no address")
+
+
+class _PublicHTTPSHandler(urllib.request.HTTPSHandler):
+    def https_open(self, req):
+        return self.do_open(_PublicHTTPSConnection, req, context=self._context)
+
+
+_opener = urllib.request.build_opener(_SameHostRedirect, _PublicHTTPSHandler(context=_tls_context()))
 
 
 def _check_url(url: str, hosts: tuple[str, ...] | None = None, pattern: re.Pattern | None = None) -> str:
     u = urllib.parse.urlparse(url)
-    host = (u.hostname or "").lower()
+    host = (u.hostname or "").lower().rstrip(".")
     if u.scheme != "https" or not host or u.username or u.password:
         raise ConnectorError("Only https:// links are allowed.")
     if hosts and host not in hosts:
         raise ConnectorError(f"Only links on {', '.join(hosts)} are allowed.")
     if pattern and not pattern.match(host):
         raise ConnectorError("That address is not allowed for this connector.")
-    if re.match(r"^\d+\.\d+\.\d+\.\d+$", host) or host in ("localhost",) or host.endswith((".local", ".internal")):
+    if "." not in host or ":" in host or re.fullmatch(r"[\d.]+|0x[\da-f.x]+", host) or host.endswith((".local", ".internal", ".localhost")):
         raise ConnectorError("Private or numeric addresses are not allowed.")
     return url
 
@@ -93,6 +141,26 @@ def _post_json(url: str, payload: dict) -> None:
         raise ConnectorError(f"The service answered {exc.code}.") from None
     except (urllib.error.URLError, TimeoutError, OSError):
         raise ConnectorError("Could not reach the service.") from None
+
+
+class _Budget:
+    """Stops one import using unlimited memory, however many pages a store sends."""
+
+    def __init__(self) -> None:
+        self.bytes = 0
+
+    def add(self, data: bytes, rows: list) -> None:
+        self.bytes += len(data)
+        if self.bytes > MAX_TOTAL_BYTES or len(rows) > MAX_ROWS:
+            raise ConnectorError("That's more sales data than one import can handle. Choose a shorter period.")
+
+
+def _orders(data: bytes, read) -> list[dict]:
+    """Rows from one page of orders; anything malformed gets a clear message rather than a crash."""
+    try:
+        return read(json.loads(data))
+    except (KeyError, TypeError, ValueError, AttributeError, OverflowError):
+        raise ConnectorError("The store sent a response Demandino couldn't read.") from None
 
 
 def _finish(rows: list[dict]) -> pd.DataFrame:
@@ -137,19 +205,26 @@ def shopify(domain: str, token: str, since: pd.Timestamp, api_version: str = "20
     params = urllib.parse.urlencode({"status": "any", "limit": 250, "created_at_min": since.isoformat(),
                                      "fields": "created_at,cancelled_at,line_items"})
     url = f"https://{domain}/admin/api/{api_version}/orders.json?{params}"
-    rows, pages = [], 0
-    while url and pages < 400:
-        _check_url(url, pattern=SHOPIFY_DOMAIN)
-        data, headers = _get(url, {"X-Shopify-Access-Token": token})
-        for order in json.loads(data).get("orders", []):
+    rows, pages, budget = [], 0, _Budget()
+
+    def read(page: dict) -> list[dict]:
+        found = []
+        for order in page.get("orders", []):
             if order.get("cancelled_at"):
                 continue
             day = pd.Timestamp(order["created_at"]).tz_localize(None).normalize()
             for li in order.get("line_items", []):
                 pid = li.get("sku") or str(li.get("product_id") or li.get("title"))
-                rows.append({"date": day, "product_id": pid, "product_name": li.get("title") or pid,
-                             "category": li.get("vendor") or "General", "units_sold": int(li.get("quantity") or 0),
-                             "price": float(li.get("price") or 0)})
+                found.append({"date": day, "product_id": pid, "product_name": li.get("title") or pid,
+                              "category": li.get("vendor") or "General", "units_sold": int(li.get("quantity") or 0),
+                              "price": float(li.get("price") or 0)})
+        return found
+
+    while url and pages < 400:
+        _check_url(url, hosts=(domain,), pattern=SHOPIFY_DOMAIN)  # the access token only ever goes to this store
+        data, headers = _get(url, {"X-Shopify-Access-Token": token})
+        rows += _orders(data, read)
+        budget.add(data, rows)
         nxt = re.search(r'<([^>]+)>;\s*rel="next"', headers.get("Link", "") or headers.get("link", ""))
         url = nxt.group(1) if nxt else None
         pages += 1
@@ -162,30 +237,39 @@ def woocommerce(site: str, key: str, secret: str, since: pd.Timestamp) -> pd.Dat
     _check_url(site)
     host = urllib.parse.urlparse(site).hostname
     auth = base64.b64encode(f"{key}:{secret}".encode()).decode()
-    rows, page = [], 1
+    rows, page, budget = [], 1, _Budget()
+
+    def read(orders: list) -> list[dict]:
+        found = []
+        for order in orders:
+            day = pd.Timestamp(order["date_created"]).normalize()
+            for li in order.get("line_items", []):
+                pid = li.get("sku") or str(li.get("product_id"))
+                qty = int(li.get("quantity") or 0)
+                found.append({"date": day, "product_id": pid, "product_name": li.get("name") or pid,
+                              "category": "General", "units_sold": qty,
+                              "price": float(li.get("total") or 0) / max(qty, 1)})
+        return found
+
     while page <= 400:
         params = urllib.parse.urlencode({"per_page": 100, "page": page, "after": since.isoformat(),
                                          "status": "completed,processing"})
         url = f"{site}/wp-json/wc/v3/orders?{params}"
         _check_url(url, hosts=(host,))
         data, _ = _get(url, {"Authorization": f"Basic {auth}"})
-        orders = json.loads(data)
-        if not orders:
+        found = _orders(data, read)
+        if not found and data.strip() in (b"[]", b""):
             break
-        for order in orders:
-            day = pd.Timestamp(order["date_created"]).normalize()
-            for li in order.get("line_items", []):
-                pid = li.get("sku") or str(li.get("product_id"))
-                qty = int(li.get("quantity") or 0)
-                rows.append({"date": day, "product_id": pid, "product_name": li.get("name") or pid,
-                             "category": "General", "units_sold": qty,
-                             "price": float(li.get("total") or 0) / max(qty, 1)})
+        rows += found
+        budget.add(data, rows)
         page += 1
     return _finish(rows)
 
 
 def amazon_report(content: bytes) -> pd.DataFrame:
     """An Amazon Seller Central 'All Orders' report (tab- or comma-separated)."""
+    if len(content) > MAX_BYTES:
+        raise ConnectorError("File is larger than 25 MB.")
     text = content[:4096].decode("utf-8", "replace")
     sep = "\t" if text.count("\t") > text.count(",") else ","
     try:
@@ -257,13 +341,18 @@ def send_slack(webhook: str, text: str) -> None:
 
 
 def send_email(host: str, port: int, user: str, password: str, sender: str, to: str, subject: str, body: str) -> None:
-    for addr in (sender, *[a.strip() for a in to.split(",")]):
+    recipients = [a.strip() for a in to.split(",")]
+    if len(recipients) > MAX_RECIPIENTS:
+        raise ConnectorError(f"Send to at most {MAX_RECIPIENTS} addresses.")
+    for addr in (sender, *recipients):
         if not EMAIL.match(addr):
             raise ConnectorError(f"'{addr[:60]}' is not a valid email address.")
-    if not re.match(r"^[A-Za-z0-9.-]{3,190}$", host) or not (0 < int(port) < 65536):
-        raise ConnectorError("Check the SMTP server and port.")
+    if not re.match(r"^[A-Za-z0-9.-]{3,190}$", host) or int(port) not in SMTP_PORTS:
+        raise ConnectorError(f"Check the SMTP server, and use port {', '.join(str(p) for p in SMTP_PORTS)}.")
+    _check_url(f"https://{host}/")
+    _public_addresses(host, int(port))
     msg = EmailMessage()
-    msg["From"], msg["To"], msg["Subject"] = sender, to, subject[:200]
+    msg["From"], msg["To"], msg["Subject"] = sender, to, " ".join(subject.split())[:200]
     msg.set_content(body[:100_000])
     ctx = _tls_context()
     try:
