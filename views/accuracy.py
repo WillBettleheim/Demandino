@@ -27,25 +27,30 @@ ui.page_header(
 daily_hit = 1 - m["Daily miss rate"]
 ui.spotlight(
     "Range hit rate · held-out days", f"{daily_hit * 100:.1f}%", "of real daily sales inside the range",
-    f"Wrong-range rate <b>{m['Daily miss rate'] * 100:.1f}%</b> per day and <b>{m['Weekly miss rate'] * 100:.1f}%</b> "
-    f"per weekly total — target ≤ 7–8%.",
+    f"Outside the range on <b>{m['Daily miss rate'] * 100:.1f}%</b> of days and <b>{m['Weekly miss rate'] * 100:.1f}%</b> "
+    f"of weeks. We aim for under 7–8%.",
     [("Daily ✓ under target" if m["Daily miss rate"] <= 0.08 else "Daily above target",
       "good" if m["Daily miss rate"] <= 0.08 else "bad"),
      ("Weekly ✓ under target" if m["Weekly miss rate"] <= 0.08 else "Weekly above target",
       "good" if m["Weekly miss rate"] <= 0.08 else "bad"),
-     (f"{len(open_preds):,} product-days tested", ""), (f"Calibrated to a {RANGE_LABEL} range", "acc")],
+     (f"{len(open_preds):,} product-days tested", ""), (f"Ranges set to hold {RANGE_LABEL} of days", "acc")],
     count=(daily_hit * 100, "acc_hit", 1, "", "%"))
 
 with st.container(horizontal=True):
-    st.metric("Daily misses", f"{m['Daily miss rate'] * 100:.1f}%", border=True,
+    st.metric("Days outside the range", f"{m['Daily miss rate'] * 100:.1f}%", border=True,
               help="Share of held-out trading days where actual sales fell outside the predicted range.")
-    st.metric("Weekly misses", f"{m['Weekly miss rate'] * 100:.1f}%", border=True,
+    st.metric("Weeks outside the range", f"{m['Weekly miss rate'] * 100:.1f}%", border=True,
               help="Share of product-weeks where the actual weekly total fell outside the predicted weekly range.")
-    st.metric("Daily error (WAPE)", f"{m['WAPE (daily)'] * 100:.0f}%", border=True,
+    st.metric("One product, one day", f"{m['WAPE (daily)'] * 100:.0f}% off", border=True,
               delta=f"{(m['WAPE (daily)'] - m['Baseline WAPE: recent average']) * 100:+.1f} pts vs simple average",
-              delta_color="inverse", help="Total absolute error ÷ total actual units. Lower is better.")
-    st.metric("Weekly error (WAPE)", f"{m['WAPE (weekly)'] * 100:.0f}%", border=True)
-    st.metric("Bias", f"{m['Bias'] * 100:+.1f}%", border=True, help="Positive = forecasts too high overall.")
+              delta_color="inverse", help="Average miss as a share of what sold. Lower is better. Single days are the hardest thing to forecast.")
+    st.metric("One product, one week", f"{m['WAPE (weekly)'] * 100:.0f}% off", border=True)
+    st.metric("One product, whole period", f"{m['Product total error'] * 100:.0f}% off", border=True,
+              help="What ordering depends on: how far each product's total for the test period was from what sold.")
+    st.metric("Whole shop, one week", f"{m['Shop weekly error'] * 100:.0f}% off", border=True,
+              help="The whole shop's weekly total, which is much steadier than any one product.")
+    st.metric("Overall too high or low", f"{m['Bias'] * 100:+.1f}%", border=True,
+              help="Above zero: forecasts ran high overall. Below zero: they ran low.")
 
 c1, c2, c3 = st.columns(3)
 ui.show(ui.gauge(m["Daily miss rate"] * 100, "Daily misses", max_value=20, good_below=8), c1)

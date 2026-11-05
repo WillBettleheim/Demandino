@@ -86,8 +86,9 @@ guide.glossary_cards()
 st.subheader("Common questions")
 FAQ = {
     "How accurate is it?": "In testing on real shop data, actual daily sales landed inside the predicted range "
-                           "about 95 days out of 100. Single days are hard to predict exactly; weekly and monthly "
-                           "totals are much steadier. See **Model accuracy** for the details.",
+                           "about 95 days out of 100. Single days and single products are hard to predict exactly, "
+                           "so plan by the week or month, where totals are much steadier. **Model accuracy** shows "
+                           "how close it got for your data.",
     "Why is the range so wide?": "Some products sell in irregular bursts. A wide range is the model being honest "
                                  "about that. Plan with weekly totals, and keep a bit more safety stock.",
     "What if I don't know my unit cost?": "Leave the default (55% of the price). Units and reorder dates don't "
