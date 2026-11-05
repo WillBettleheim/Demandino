@@ -105,6 +105,9 @@ def event_multiplier(dates: pd.DatetimeIndex, events: tuple) -> np.ndarray:
     return m
 
 
+MAX_DISCOUNT_SENSITIVITY = -2.0  # keeps a noisy estimate from promising a huge jump from a deep discount
+
+
 def _scale(r: ForecastResult, k: np.ndarray | float, price: np.ndarray | None = None) -> ForecastResult:
     return r.with_values(r.mean * k, r.lower * k, r.upper * k, price)
 
@@ -154,8 +157,21 @@ def compute(fc: DemandForecaster, sales: pd.DataFrame, elasticities: tuple[dict,
             with_events: bool = True) -> ForecastResult:
         """ML forecast at the reference price (seasonality, promos, level); the regular-price change from the
         reference is applied with the product's price elasticity, then events and launch ramp-up."""
+        plan = dict(level_override=level_override, driver_plan=dict(inp.driver_plan) or None)
         r = fc.forecast_context(ctx, start, horizon, ref_price * (1 - disc_ * promo_), np.full(horizon, ref_price),
-                                promo_, level_override=level_override, driver_plan=dict(inp.driver_plan) or None)
+                                promo_, **plan)
+        if promo_.any():
+            # Shops with few past sales can't teach the model what a discount does, so a discount always lifts sales by
+            # at least what the product's price sensitivity says, and a bigger discount never sells less.
+            plain = fc.forecast_context(ctx, start, horizon, np.full(horizon, ref_price), np.full(horizon, ref_price),
+                                        np.zeros(horizon, int), **plan)
+            floor = plain.mean * (1 - disc_ * promo_) ** max(elasticity, MAX_DISCOUNT_SENSITIVITY)
+            for step in np.arange(0.1, float(np.max(disc_ * promo_)), 0.1):  # what any smaller discount would have sold
+                smaller = fc.forecast_context(ctx, start, horizon, ref_price * (1 - np.minimum(disc_, step) * promo_),
+                                              np.full(horizon, ref_price), promo_, **plan)
+                floor = np.maximum(floor, smaller.mean)
+            lift = np.where(promo_ & (r.mean > 0), np.maximum(floor / np.maximum(r.mean, 1e-9), 1.0), 1.0)
+            r = r.with_values(r.mean * lift, r.lower * lift, r.upper * lift)
         r.level_uncertainty = unc
         k = (reg / ref_price) ** elasticity
         if adjust:
@@ -187,7 +203,7 @@ def compute(fc: DemandForecaster, sales: pd.DataFrame, elasticities: tuple[dict,
         b = run(no_promo, disc, price, adjust=False).mean.sum()
         c = run(promo, disc, price, adjust=False).mean.sum()
         d = (run(promo, disc, price, adjust=False).mean * events).sum()
-        drivers = [("Recent run-rate", run_rate), ("Season, trend & calendar", a - run_rate), ("Price change", b - a),
+        drivers = [("Recent pace", run_rate), ("Season, trend & calendar", a - run_rate), ("Price change", b - a),
                    ("Promotions", c - b), ("Events", d - c), ("Launch ramp-up", total - d)]
 
     last_year = None
