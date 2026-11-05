@@ -54,6 +54,10 @@ CSS = """
 [data-testid="stMainBlockContainer"] [data-testid="stLayoutWrapper"] {animation: none !important;}
 [data-testid="stMainBlockContainer"] [data-testid="stVerticalBlock"] {gap: 0;}
 [data-testid="stElementContainer"]:has(> .stHtml > style:only-child) {height: 0; margin: 0;}
+/* This page is always navy, so its menu stays white in light mode too. */
+[data-testid="stHeader"] {background: rgba(11,23,48,.78) !important; border-bottom-color: rgba(248,248,246,.12) !important;}
+[data-testid="stHeader"] a, [data-testid="stHeader"] p, [data-testid="stHeader"] span, [data-testid="stHeader"] button,
+[data-testid="stHeader"] svg {color: #F8F8F6 !important; fill: currentColor;}
 .st-key-dml_stage {position: relative;}
 .dml {--navy: #0B1730; --white: #F8F8F6; --coral: #FF7F6E; --mute: rgba(248,248,246,.74); color: var(--white);
   font-family: Inter, sans-serif; background: var(--navy); overflow: hidden;}
