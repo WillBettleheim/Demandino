@@ -82,7 +82,15 @@ with t4:
         st.warning("This permanently deletes your account and everything saved in it: datasets, scenarios, stock "
                    "tables, alerts, connector keys, tracked forecasts, share links and purchase orders.")
         confirm = st.text_input("Type DELETE to confirm", max_chars=10)
-        if st.button("Delete my account", type="primary", disabled=confirm != "DELETE", icon=":material/delete_forever:"):
-            db.delete_user(uid)
-            account.sign_out()
-            st.rerun()
+        password = st.text_input("Your password", type="password", max_chars=128, key="delete_pw",
+                                 help="So someone using a browser you left signed in can't delete your account.")
+        if st.button("Delete my account", type="primary", disabled=confirm != "DELETE" or not password,
+                     icon=":material/delete_forever:"):
+            try:
+                db.authenticate(account.current_name(), password)
+            except db.AuthError as exc:
+                st.error(str(exc))
+            else:
+                db.delete_user(uid)
+                account.sign_out()
+                st.rerun()
