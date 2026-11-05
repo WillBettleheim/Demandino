@@ -624,3 +624,54 @@ def test_product_edit_rules(sales):
     assert edits["changes"][r["product_id"]]["price"] == pytest.approx(good["price"] * 2)
     assert catalog.dataset_id("sample-2026-01-01") == "sample" and catalog.dataset_id("upload-abc") == "upload-abc"
     assert catalog.can_forecast(sales) and not catalog.can_forecast(sales.iloc[:0])
+
+
+def test_orders_cover_delivery_time_even_with_a_short_forecast_period(fc):
+    from demandino.analysis import inventory_plan
+    short, long = fc.forecast_product("P001", 14), fc.forecast_product("P001", 90)
+    a = inventory_plan(short, 0, lead_time=30, review_days=14, service_level=0.95)
+    b = inventory_plan(long, 0, lead_time=30, review_days=14, service_level=0.95)
+    assert a["needs_order_now"] and a["order_qty"] > 0.6 * b["order_qty"]
+    # Stock that lasts the 14 days shown but not the 30-day delivery still needs an order.
+    assert inventory_plan(short, short.mean.sum() * 1.2, 30, 14, 0.95)["reorder_by"] is not None
+    assert inventory_plan(long, 1e9, 14, 14, 0.95)["order_qty"] == 0
+
+
+def test_a_bigger_discount_never_sells_less(fc, sales):
+    from demandino.analysis import elasticities
+    from demandino.scenario import ForecastInputs, compute
+    g = sales[sales["product_id"] == "P001"]
+    price, start = float(g["regular_price"].iloc[-1]), g["date"].max() + pd.Timedelta(days=1)
+    dates = (start.date(), (start + pd.Timedelta(days=13)).date())
+    run = lambda d: compute(fc, sales, elasticities(sales), fc.level_uncertainty, ForecastInputs(
+        False, "P001", "x", g["category"].iloc[0], price, price * .5, 60, start, promo_kind="Specific dates", discount=d,
+        promo_dates=dates), detail=False).total
+    plain = compute(fc, sales, elasticities(sales), fc.level_uncertainty, ForecastInputs(
+        False, "P001", "x", g["category"].iloc[0], price, price * .5, 60, start), detail=False).total
+    totals = [plain, run(.1), run(.2), run(.4)]
+    assert all(b >= a * 0.995 for a, b in zip(totals, totals[1:])) and totals[-1] > plain
+
+
+def test_uploads_read_common_formats():
+    from demandino.data import parse_numbers, prepare_sales
+    days = pd.date_range("2025-01-01", periods=200)
+    base = pd.DataFrame({"date": days, "product_id": "A", "units_sold": 3, "price": 10.0})
+    for fmt in ("%d/%m/%Y", "%m/%d/%Y", "%Y-%m-%d", "%d.%m.%y", "%d %b %Y"):
+        out = prepare_sales(base.assign(date=days.strftime(fmt)))  # a misread day and month would scramble the history
+        assert len(out) == 200 and out["date"].min() == days[0] and out["date"].max() == days[-1], fmt
+    renamed = base.rename(columns={"date": "Order Date", "product_id": "Item", "units_sold": "Qty Sold", "price": "Unit Price"})
+    assert len(prepare_sales(renamed)) == 200
+    assert parse_numbers(pd.Series(["$1,234.50", "10,50", "-3"])).tolist() == [1234.5, 10.5, -3.0]
+    assert prepare_sales(base.assign(price="$1,010.00"))["price"].iloc[0] == 1010
+    with pytest.raises(ValueError, match="Your file has: date, product_id, units_sold"):
+        prepare_sales(base.drop(columns="price"))
+
+
+def test_erratic_products_blend_keeps_promotion_lift(fc):
+    bursty = fc.context_for("P001")
+    bursty.units = np.where(np.arange(len(bursty.units)) % 5 == 0, bursty.units * 5, 0)
+    start = bursty.start + pd.Timedelta(days=len(bursty.units))
+    flat = np.full(30, float(bursty.regular[-1]))
+    none = fc.forecast_context(bursty, start, 30, flat, flat, np.zeros(30, int))
+    promo = fc.forecast_context(bursty, start, 30, flat * .7, flat, np.ones(30, int))
+    assert promo.mean.sum() > none.mean.sum() and (none.mean >= 0).all()

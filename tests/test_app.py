@@ -278,3 +278,10 @@ def test_removed_and_renamed_products_flow_through_the_whole_app():
     assert "Removed products" in " ".join(s.value for s in at.subheader)
     next(b for b in at.button if b.key == "catalog_back_P002").click().run()
     assert "P002" in set(at.session_state["_app"].sales["product_id"])
+
+
+def test_example_numbers_are_called_examples():
+    at = _forecast_app()
+    assert "An example stock of 500 units" in _text(at) and "a guess until you enter your unit cost" in _text(at)
+    at.number_input(key="fc_stock").set_value(100_000).run()
+    assert "Your 100,000 units would cover" in _text(at) and "An example stock" not in _text(at)
