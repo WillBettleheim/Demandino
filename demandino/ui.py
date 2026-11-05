@@ -13,20 +13,20 @@ import streamlit as st
 from .model import RANGE_LABEL, ForecastResult
 
 # Mid-tone colours that read well on both the dark and the light background.
-BRAND = "#16A095"   # teal: secondary series
-HIST = "#7A8797"    # slate: history and context
-FC = "#2F86E0"      # azure: the forecast
-BAND = "rgba(47,134,224,0.18)"
-PROMO = "#D9547F"
+BRAND = "#3C82D6"   # blue: secondary series
+HIST = "#7E8CA8"    # slate navy: history and context
+FC = "#E8604C"      # coral: the forecast
+BAND = "rgba(232,96,76,0.18)"
+PROMO = "#16A095"
 GOOD = "#22A55B"    # status colours are reserved for state, never for a series
-BAD = "#E0484B"
+BAD = "#C81E3A"
 WARN = "#E39A1F"
 LAST_YEAR = "#BE8A1E"
 # Fixed hue order, checked for colour-blind separation on both the light and the dark surface.
-PALETTE = ["#2F86E0", "#D4702B", "#16A095", "#BE8A1E", "#D9547F", "#6C9A30"]
-SEQ = [[0, "rgba(47,134,224,0.05)"], [1, "#2F86E0"]]  # heatmaps: one hue, light to dark
+PALETTE = ["#E8604C", "#3C82D6", "#16A095", "#BE8A1E", "#C4507E", "#6C9A30"]
+SEQ = [[0, "rgba(232,96,76,0.05)"], [1, "#E8604C"]]  # heatmaps: one hue, light to dark
 
-PAGE_PATHS = ["/", "/forecast", "/planning", "/advisor", "/budget", "/targets", "/whatif", "/alerts", "/changes",
+PAGE_PATHS = ["/", "/dashboard", "/forecast", "/planning", "/advisor", "/budget", "/targets", "/whatif", "/alerts", "/changes",
               "/clearance", "/explore", "/overview", "/hierarchy", "/lifecycle", "/together", "/lostsales",
               "/compare", "/assistant", "/inbox", "/workspace", "/datacheck", "/connections", "/security",
               "/history", "/orders", "/accuracy", "/tracking", "/help", "/terms"]
@@ -34,28 +34,28 @@ PAGE_PATHS = ["/", "/forecast", "/planning", "/advisor", "/budget", "/targets", 
 CSS = """
 <style>
 :root, html[data-dm="dark"] {
-  --a: #5CA8F5; --b: #F0B35A; --c: #5AA9EA;
-  --ink: #E8EEF4; --ink-2: rgba(232,238,244,.70);
-  --glass: rgba(255,255,255,0.035); --glass-2: rgba(255,255,255,0.06);
-  --edge: rgba(92,168,245,0.18); --edge-hi: rgba(92,168,245,0.40);
+  --a: #FF7F6E; --b: #FFB4A8; --c: #A9BCE0; --btn: #D6452F; --btn-shadow: rgba(232,96,76,.75);
+  --ink: #F7F8FB; --ink-2: rgba(247,248,251,.72);
+  --glass: rgba(255,255,255,0.04); --glass-2: rgba(255,255,255,0.07);
+  --edge: rgba(255,255,255,0.11); --edge-hi: rgba(255,127,110,0.42);
   --glow: 0 18px 44px -32px rgba(0,0,0,0.9);
-  --hero-bg: linear-gradient(135deg, rgba(92,168,245,0.13), rgba(240,179,90,0.05) 70%);
-  --aurora-1: rgba(47,134,224,0.13); --aurora-2: rgba(240,179,90,0.06); --aurora-3: rgba(92,168,245,0.05);
-  --tab-on: rgba(92,168,245,.20);
-  --chip-good: #5FD38A; --chip-warn: #F0B35A; --chip-bad: #F58A8A; --chip-acc: #9CCBFA;
-  --bar: rgba(14,21,32,0.76);
+  --hero-bg: linear-gradient(135deg, rgba(255,127,110,0.14), rgba(60,130,214,0.06) 70%);
+  --aurora-1: rgba(60,130,214,0.12); --aurora-2: rgba(255,127,110,0.10); --aurora-3: rgba(255,255,255,0.03);
+  --tab-on: rgba(255,127,110,.20);
+  --chip-good: #5FD38A; --chip-warn: #F0B35A; --chip-bad: #FF8F9F; --chip-acc: #FFB4A8;
+  --bar: rgba(11,23,48,0.78);
 }
 html[data-dm="light"] {
-  --a: #1D6FCF; --b: #B26A0B; --c: #2472BD;
-  --ink: #14202E; --ink-2: rgba(20,32,46,.70);
-  --glass: rgba(255,255,255,0.82); --glass-2: rgba(255,255,255,0.97);
-  --edge: rgba(29,111,207,0.15); --edge-hi: rgba(29,111,207,0.36);
-  --glow: 0 1px 2px rgba(20,32,46,0.05), 0 14px 34px -26px rgba(29,111,207,0.35);
-  --hero-bg: linear-gradient(135deg, rgba(29,111,207,0.10), rgba(240,179,90,0.08) 70%);
-  --aurora-1: rgba(47,134,224,0.11); --aurora-2: rgba(240,179,90,0.08); --aurora-3: rgba(92,168,245,0.07);
-  --tab-on: rgba(29,111,207,.13);
-  --chip-good: #15803D; --chip-warn: #B26A0B; --chip-bad: #B91C1C; --chip-acc: #1D6FCF;
-  --bar: rgba(246,248,250,0.82);
+  --a: #C63D28; --b: #1B2F5E; --c: #2A4A8C; --btn: #C63D28; --btn-shadow: rgba(198,61,40,.6);
+  --ink: #0F1E3D; --ink-2: rgba(15,30,61,.70);
+  --glass: rgba(255,255,255,0.86); --glass-2: rgba(255,255,255,0.98);
+  --edge: rgba(15,30,61,0.12); --edge-hi: rgba(198,61,40,0.36);
+  --glow: 0 1px 2px rgba(15,30,61,0.05), 0 14px 34px -26px rgba(15,30,61,0.32);
+  --hero-bg: linear-gradient(135deg, rgba(15,30,61,0.06), rgba(232,96,76,0.10) 70%);
+  --aurora-1: rgba(15,30,61,0.05); --aurora-2: rgba(232,96,76,0.08); --aurora-3: rgba(15,30,61,0.03);
+  --tab-on: rgba(198,61,40,.12);
+  --chip-good: #15803D; --chip-warn: #B26A0B; --chip-bad: #B4152F; --chip-acc: #C63D28;
+  --bar: rgba(255,255,255,0.84);
 }
 
 /* Aurora backdrop (static: animating a full-screen layer causes repaint glitches in some browsers). */
@@ -111,7 +111,7 @@ h1, h2, h3, h4, h5 {letter-spacing: -0.02em;}
 .dm-chip.good {color: var(--chip-good); border-color: rgba(34,197,94,.35); background: rgba(34,197,94,.08);}
 .dm-chip.warn {color: var(--chip-warn); border-color: rgba(245,158,11,.38); background: rgba(245,158,11,.08);}
 .dm-chip.bad {color: var(--chip-bad); border-color: rgba(239,68,68,.38); background: rgba(239,68,68,.08);}
-.dm-chip.violet, .dm-chip.acc {color: var(--chip-acc); border-color: var(--edge-hi); background: rgba(47,134,224,.10);}
+.dm-chip.violet, .dm-chip.acc {color: var(--chip-acc); border-color: var(--edge-hi); background: rgba(232,96,76,.10);}
 
 /* Glass cards (st.container keyed "card-…") and metrics */
 [class*="st-key-card-"] {background: var(--glass) !important; border: 1px solid var(--edge) !important;
@@ -134,8 +134,8 @@ div[data-testid="stMetricValue"] {font-family: "Space Grotesk", Inter, sans-seri
 .stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] {display: none;}
 
 /* Buttons */
-[data-testid="stBaseButton-primary"] {background: #1F6FD6 !important;
-  border: none !important; color: #fff !important; box-shadow: 0 10px 26px -16px rgba(31,111,214,.9);
+[data-testid="stBaseButton-primary"] {background: var(--btn) !important;
+  border: none !important; color: #fff !important; box-shadow: 0 10px 26px -16px var(--btn-shadow);
   transition: transform .15s ease, filter .15s ease;}
 [data-testid="stBaseButton-primary"]:hover {transform: translateY(-1px); filter: brightness(1.06);}
 [data-testid="stBaseButton-primary"]:disabled {opacity: .4; filter: grayscale(.5); transform: none; box-shadow: none;
@@ -147,7 +147,7 @@ div[data-testid="stMetricValue"] {font-family: "Space Grotesk", Inter, sans-seri
 .dm-brand {font-family: "Space Grotesk", Inter, sans-serif; font-weight: 700; font-size: 1.5rem; letter-spacing: -0.03em;
   display: flex; align-items: center; gap: .5rem;}
 .dm-brand i {width: 1.35rem; height: 1.35rem; border-radius: .45rem; display: inline-block;
-  background: conic-gradient(from 200deg, #2F86E0, #16A095, #F0B35A, #2F86E0); box-shadow: 0 0 14px rgba(47,134,224,.4);}
+  background: conic-gradient(from 200deg, #FF7F6E, #FFFFFF, #1B2F5E, #FF7F6E); box-shadow: 0 0 14px rgba(255,127,110,.4);}
 .dm-brand b {font-weight: 700;}
 .dm-brand span {color: var(--a);}
 .dm-sub {color: var(--ink-2); font-size: .8rem; margin-top: -.1rem;}
@@ -173,7 +173,7 @@ div[data-testid="stMetricValue"] {font-family: "Space Grotesk", Inter, sans-seri
 .dm-step {display: flex; gap: .7rem; align-items: flex-start; padding: .75rem .85rem; border-radius: .9rem;
   background: var(--glass); border: 1px solid var(--edge);}
 .dm-step > span {flex: none; width: 1.75rem; height: 1.75rem; border-radius: 50%; display: grid; place-items: center;
-  font-weight: 700; color: #fff; background: #1F6FD6;}
+  font-weight: 700; color: #fff; background: var(--btn);}
 .dm-step b {color: var(--ink);} .dm-step p {margin: .15rem 0 0; font-size: .86rem; color: var(--ink-2); line-height: 1.4;}
 
 /* "In short": the forecast as plain sentences with the next action */
@@ -421,7 +421,7 @@ def style(fig: go.Figure, title: str | None = None, height: int = 360, legend: b
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(family="Inter, sans-serif"),
         hoverlabel=dict(bgcolor="rgba(255,255,255,0.96)" if light else "rgba(14,21,32,0.95)",
                         bordercolor="rgba(47,134,224,0.45)",
-                        font=dict(color="#14202E" if light else "#E8EEF4", family="Inter, sans-serif")),
+                        font=dict(color="#0F1E3D" if light else "#F7F8FB", family="Inter, sans-serif")),
         showlegend=legend, legend=dict(orientation="h", yanchor="bottom", y=1.0, xanchor="right", x=1,
                                        font=dict(size=11), bgcolor="rgba(0,0,0,0)"),
         **layout,
