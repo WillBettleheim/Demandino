@@ -64,7 +64,7 @@ def _plan(data_key: str, stock: pd.DataFrame, _fc, level_uncertainty: float) -> 
 
 
 def gather(app, currency: str = "") -> list[dict]:
-    """Everything needing attention for the active dataset (used by the Home and Inbox pages)."""
+    """Everything needing attention for the active dataset (used by the Dashboard and Inbox pages)."""
     saved = db.get_setting(app.user_id, f"stock:{app.data_key}") if app.user_id else None
     stock = st.session_state.get(f"pl_stock_{app.data_key}")
     stock = stock if stock is not None else (pd.DataFrame(saved) if saved else default_stock(app.sales))

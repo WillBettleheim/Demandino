@@ -6,7 +6,7 @@ from demandino.legal import TERMS_VERSION
 
 PAGES = ["views/forecast.py", "views/planning.py", "views/advisor.py", "views/explore.py", "views/overview.py",
          "views/accuracy.py", "views/alerts.py", "views/clearance.py", "views/targets.py", "views/datacheck.py",
-         "views/home.py", "views/compare.py", "views/lifecycle.py", "views/together.py", "views/changes.py", "views/lostsales.py",
+         "views/home.py", "views/welcome.py", "views/compare.py", "views/lifecycle.py", "views/together.py", "views/changes.py", "views/lostsales.py",
          "views/whatif.py", "views/budget.py", "views/inbox.py", "views/help.py", "views/terms.py"]
 
 
@@ -62,6 +62,7 @@ def test_similar_product_basis():
 def test_real_store_pages_render(page):
     at = _new_app()
     at.run()
+    at.switch_page("views/home.py").run()
     at.segmented_control(key="data_source").set_value("Real store").run()
     at.switch_page(page).run()
     assert not at.exception, at.exception
@@ -70,6 +71,7 @@ def test_real_store_pages_render(page):
 def test_terms_gate_blocks_until_accepted():
     at = _new_app(accept=False)
     at.run()
+    at.switch_page("views/home.py").run()
     assert not at.exception
     assert any("Terms" in h.proto.body for h in at.get("html"))
     assert "home_pid" not in at.session_state  # the home page did not run
@@ -166,6 +168,7 @@ def test_tracking_an_adjusted_forecast_keeps_the_model_version():
     at = _new_app()
     at.session_state["user_id"] = uid
     at.run()
+    at.switch_page("views/home.py").run()
     start = pd.Timestamp(at.session_state["_app"].last_date) + pd.Timedelta(days=1)
     at.session_state["load_scenario"] = ForecastInputs(
         False, "P001", "Earbuds", "Electronics", 250.0, 140.0, 30, start,
@@ -224,3 +227,27 @@ def test_analysis_pages_offer_a_csv_download(page):
     at.switch_page(page).run()
     assert not at.exception, at.exception
     assert any(b.proto.label.startswith("Download") for b in at.get("download_button"))
+
+
+def test_welcome_page_opens_without_terms_data_or_sidebar():
+    at = _new_app(accept=False)
+    at.run()
+    assert not at.exception, at.exception
+    assert "before it sells" in _text(at) and "Terms &amp; conditions" not in _text(at)
+    assert len(at.sidebar) == 0 and "_app" not in at.session_state
+
+
+def test_welcome_buttons_lead_to_the_app():
+    at = _new_app()
+    at.run()
+    at.button(key="dml_open").click().run()
+    assert not at.exception, at.exception
+    assert "Your shop at a glance" in _text(at)
+
+
+def test_welcome_script_survives_the_html_sanitiser():
+    import re
+
+    from demandino import landing
+    assert not re.search(r"<[/\\w!]", landing.JS_BODY)  # Streamlit removes a whole script if it holds anything like a tag
+    assert "__ICONS__" not in landing.JS

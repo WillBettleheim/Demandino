@@ -38,7 +38,7 @@ items = inbox.gather(A, ui.currency())
 urgent = sum(i["priority"] == "now" for i in items)
 
 ui.page_header("Your shop at a glance", f"{s['product_id'].nunique()} products · sales up to {last:%d %b %Y}. "
-               "What has happened, what's coming and what needs you.", eyebrow="Home")
+               "What has happened, what's coming and what needs you.", eyebrow="Dashboard")
 guide.welcome()
 
 with st.container(horizontal=True, key="fc_kpis"):

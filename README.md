@@ -38,7 +38,8 @@ your own data, choose **Upload my CSV** in the sidebar. You can download a templ
   cover the forecast (with last year overlaid), a drivers waterfall, weekly and monthly breakdowns, price and
   promotion what-ifs, an inventory plan, sales patterns, saved scenarios compared side by side, and an Excel or
   CSV export.
-- **Home.** Your shop at a glance, with a one-click Excel report of the whole shop.
+- **Home.** A welcome page with an interactive tour of the product.
+- **Dashboard.** Your shop at a glance, with a one-click Excel report of the whole shop.
 - **Compare products.** Up to four products side by side: forecast shape, life stage, revenue and recent change.
 - **Security.** Signed-in browsers, stored keys (names only) and recent sign-ins, with "sign out everywhere".
 - **Inbox.** One list of everything needing attention — orders due now or this week, stock about to expire,
@@ -108,7 +109,7 @@ your own data, choose **Upload my CSV** in the sidebar. You can download a templ
 - **Model accuracy.** A back-test on the last 90 days compared with simple baselines, plus error by weeks ahead
   and by category, and feature importance.
 
-**Light and dark mode.** Use the sun/moon switch in the sidebar. The "Harbor" theme (azure and amber) has a
+**Light and dark mode.** Use the sun/moon switch in the sidebar. The "Harbor" theme (navy, white and coral) has a
 deep navy dark mode and a crisp, cool light mode, with a chart palette checked for colour-blind readers, and every chart and card follows the active mode.
 
 The first run trains the model (about 10 seconds) and saves it in `.cache/`, so later runs start instantly.

@@ -13,7 +13,7 @@ st.page_link("views/forecast.py", label="Go to Forecast a product", icon=":mater
 
 st.subheader("Which page do I need?")
 PAGES = [
-    ("views/home.py", "Home", ":material/home:", "Your shop at a glance: sales, the forecast and what needs you."),
+    ("views/home.py", "Dashboard", ":material/space_dashboard:", "Your shop at a glance: sales, the forecast and what needs you."),
     ("views/inbox.py", "Inbox", ":material/inbox:",
      "Everything that needs attention across the app, most urgent first — start here each week."),
     ("views/forecast.py", "Forecast a product", ":material/online_prediction:",

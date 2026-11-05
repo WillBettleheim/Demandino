@@ -17,18 +17,10 @@ if share:
     shared_view.render(share)
     st.stop()
 
-with st.sidebar:
-    st.html('<div class="dm-brand"><i></i><b>Demand<span>ino</span></b></div>'
-            '<div class="dm-sub">Machine-learning demand forecasting</div>')
-    ui.theme_toggle()
-    if legal.accepted():
-        account.sidebar_account()
-legal.sync_cookie()
-account.sync_cookie()
-
 page = st.Page
 pages = {
-    "": [page("views/home.py", title="Home", icon=":material/home:", default=True),
+    "": [page("views/welcome.py", title="Home", icon=":material/home:", default=True),
+         page("views/home.py", title="Dashboard", icon=":material/space_dashboard:", url_path="dashboard"),
          page("views/inbox.py", title="Inbox", icon=":material/inbox:")],
     "Forecast": [
         page("views/forecast.py", title="Forecast a product", icon=":material/online_prediction:", url_path="forecast"),
@@ -69,6 +61,22 @@ pages = {
     ],
 }
 nav = st.navigation(pages, position="top")
+
+# The welcome page needs no data, sidebar or model, so it opens instantly and the terms come when someone starts.
+if nav.url_path == "":
+    legal.sync_cookie()
+    account.sync_cookie()
+    nav.run()
+    st.stop()
+
+with st.sidebar:
+    st.html('<div class="dm-brand"><i></i><b>Demand<span>ino</span></b></div>'
+            '<div class="dm-sub">Machine-learning demand forecasting</div>')
+    ui.theme_toggle()
+    if legal.accepted():
+        account.sidebar_account()
+legal.sync_cookie()
+account.sync_cookie()
 
 if not legal.gate():
     st.stop()
