@@ -143,24 +143,34 @@ def inventory_plan(res: ForecastResult, current_stock: float, lead_time: int, re
     """
     z = NormalDist().inv_cdf(service_level)
     n = len(res.mean)
-    demand_lt, _, hi_lt = res.total_interval(lead_time, z=1.0)
+    # Orders must cover delivery and review time even when they reach past the forecast period: carry on at its
+    # recent pace, so a short forecast period doesn't shrink the order.
+    pad = lead_time + review_days
+    tail = max(1, min(28, n))
+    ahead = ForecastResult(res.dates.append(pd.date_range(res.dates[-1] + pd.Timedelta(days=1), periods=pad)),
+                           np.r_[res.mean, np.full(pad, res.mean[-tail:].mean())],
+                           np.r_[res.lower, np.full(pad, res.lower[-tail:].mean())],
+                           np.r_[res.upper, np.full(pad, res.upper[-tail:].mean())],
+                           np.r_[res.price, np.full(pad, res.price[-1])], np.r_[res.promo, np.zeros(pad, int)],
+                           res.level, res.level_uncertainty, res.coverage)
+    demand_lt, _, hi_lt = ahead.total_interval(lead_time, z=1.0)
     safety = z * (hi_lt - demand_lt)
-    cum = np.concatenate([[0.0], np.cumsum(res.mean)])
+    cum = np.concatenate([[0.0], np.cumsum(ahead.mean)])
     stock_at = current_stock - cum[:n]  # projected stock at the start of each day
-    out_idx = int(np.argmax(cum[1:] > current_stock)) if (cum[1:] > current_stock).any() else None
+    sold = cum[1:n + 1]
+    out_idx = int(np.argmax(sold > current_stock)) if (sold > current_stock).any() else None
     stockout = res.dates[out_idx] if out_idx is not None else None
 
     # Reorder point from each day onward (demand over the following lead time + safety stock).
-    lt_ahead = cum[np.minimum(np.arange(n) + lead_time, n)] - cum[:n]
+    lt_ahead = cum[np.arange(n) + lead_time] - cum[:n]
     hit = stock_at <= lt_ahead + safety
     reorder_idx = int(np.argmax(hit)) if hit.any() else None
 
     order_qty = 0.0
     if reorder_idx is not None:
         i = reorder_idx
-        cover = min(lead_time + review_days, n - i)
-        window = res.with_values(res.mean[i:], res.lower[i:], res.upper[i:], sl=slice(i, None))
-        demand_cover, _, hi_cover = window.total_interval(cover, z=1.0)
+        window = ahead.with_values(ahead.mean[i:], ahead.lower[i:], ahead.upper[i:], sl=slice(i, None))
+        demand_cover, _, hi_cover = window.total_interval(lead_time + review_days, z=1.0)
         order_qty = max(0.0, demand_cover + z * (hi_cover - demand_cover) - max(stock_at[i], 0))
     return {
         "z": z,
