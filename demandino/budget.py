@@ -17,6 +17,7 @@ def needs(fc, stock: pd.DataFrame, months: int = 6) -> pd.DataFrame:
     start = fc.sales["date"].max() + pd.Timedelta(days=1)
     end = (start + pd.DateOffset(months=months)).replace(day=1) - pd.Timedelta(days=1)
     horizon = (end - start).days + 1
+    stock = stock[stock["product_id"].astype(str).isin(fc.sales["product_id"].unique())]  # not removed products
     per_product = stock.groupby("product_id").agg(stock=("stock", "sum"), unit_cost=("unit_cost", "mean"))
     rows = []
     for pid, g in fc.sales.groupby("product_id"):

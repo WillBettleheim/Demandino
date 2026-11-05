@@ -108,6 +108,8 @@ if A.user_id is not None:
         st.markdown("#### Your targets")
         rows = []
         for t in saved:
+            if not targets.still_sold(A.fc, t["products"]):  # every product in it has since been removed
+                continue
             q = targets.progress(A.fc, t["products"], pd.Timestamp(t["start"]), pd.Timestamp(t["end"]), t["metric"])
             rows.append({"Target": t["label"], "Period": f"{t['start']} → {t['end']}",
                          "Measure": targets.METRICS[t["metric"]], "Goal": t["target"], "Projected": q["projected"],

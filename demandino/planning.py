@@ -83,6 +83,7 @@ def apply_order_rules(qty: float, moq: float, case_pack: float) -> float:
 def portfolio_plan(fc: DemandForecaster, level_unc: float, stock: pd.DataFrame, horizon: int, review: int,
                    service: float, budget: float | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
     """One row per product × warehouse (forecast, risk, order advice) and the daily forecast (long format)."""
+    stock = stock[stock["product_id"].astype(str).isin(fc.sales["product_id"].unique())]  # not removed products
     stock = stock.copy()
     for col, default in (("warehouse", "Main"), ("demand_share", 100.0), ("moq", 0), ("case_pack", 1),
                          ("unit_cost", 0.0), ("shelf_life", 0), ("expires_in", 0), ("supplier", "Main supplier")):

@@ -29,9 +29,16 @@ def _value(units: np.ndarray, price: np.ndarray, metric: str) -> np.ndarray:
     return units * price if metric == "revenue" else units
 
 
+def still_sold(fc, products: list[str]) -> list[str]:
+    """The products in a saved target that haven't since been removed from the shop."""
+    known = set(fc.sales["product_id"].unique())
+    return [p for p in products if p in known]
+
+
 def progress(fc, products: list[str], start: pd.Timestamp, end: pd.Timestamp, metric: str = "units") -> dict:
     """Actual so far, forecast for the rest, projected total and its uncertainty, per product and in total."""
     start, end = pd.Timestamp(start), pd.Timestamp(end)
+    products = still_sold(fc, products)
     sales = fc.sales[fc.sales["product_id"].isin(products)]
     last = fc.sales["date"].max()
     done = sales[(sales["date"] >= start) & (sales["date"] <= min(end, last))]
