@@ -94,7 +94,7 @@ st.dataframe(cat_tbl.drop(columns="prev").reset_index().sort_values("revenue", a
 st.markdown("#### Product segmentation")
 st.caption("**ABC** by revenue share — A: top 70% of revenue, B: next 20%, C: last 10%. **XYZ** by weekly demand "
            "variability — X: steady, Y: variable, Z: erratic. **AX** items deserve tight stock control; **CZ** items "
-           "are candidates for lower service levels or make-to-order.")
+           "could carry less spare stock, or be made to order.")
 abc = abc_classes(A.sales)
 c1, c2 = st.columns([1, 2])
 matrix = pd.crosstab(abc["ABC"], abc["XYZ"]).reindex(index=["A", "B", "C"], columns=["X", "Y", "Z"], fill_value=0)

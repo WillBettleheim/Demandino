@@ -24,8 +24,8 @@ with ui.card("plan-controls"):
     horizon = c1.segmented_control("Planning horizon", [30, 60, 90], default=60, required=True,
                                    format_func=lambda d: f"{d} days", key="pl_h")
     review = c2.number_input("Days between orders", 1, 60, 14, key="pl_review")
-    service = c3.number_input("Service level %", 80.0, 99.9, 95.0, 0.5, key="pl_service") / 100
-    default_lead = c4.number_input("Default lead time (days)", 1, 180, 14, key="pl_lead")
+    service = c3.number_input("Avoid running out (%)", 80.0, 99.9, 95.0, 0.5, key="pl_service") / 100
+    default_lead = c4.number_input("Usual delivery time (days)", 1, 180, 14, key="pl_lead")
     budget = c5.number_input(f"Purchase budget ({ui.currency()})", 0, 1_000_000_000, 0, 1000, key="pl_budget",
                              help="0 = no limit. With a budget, the most urgent orders are kept and the rest are "
                                   "marked Deferred.") or None
@@ -58,7 +58,7 @@ with st.expander("Stock, warehouses & ordering rules — edit to match your busi
                                 "demand_share": st.column_config.NumberColumn("Demand share %", min_value=0,
                                                                               max_value=100, default=100),
                                 "stock": st.column_config.NumberColumn("Stock on hand", min_value=0, step=1),
-                                "lead_time": st.column_config.NumberColumn("Lead time (days)", min_value=1,
+                                "lead_time": st.column_config.NumberColumn("Delivery time (days)", min_value=1,
                                                                            max_value=180, step=1, default=14),
                                 "moq": st.column_config.NumberColumn("MOQ", min_value=0, step=1, default=0),
                                 "case_pack": st.column_config.NumberColumn("Case pack", min_value=1, step=1, default=1),
@@ -96,10 +96,10 @@ learned = suppliers.stats(suppliers.deliveries(db.list_pos(uid)), float(service)
 if len(learned) and learned["planning_lead"].notna().any():
     if st.toggle("Use delivery times learned from your received orders", value=True, key="pl_learned",
                  help="Each supplier's average delivery time plus a margin for how much it varies, instead of the "
-                      "lead time typed in. Record arrivals on the Purchase orders page."):
+                      "delivery time typed in. Record arrivals on the Purchase orders page."):
         edited, changes = suppliers.apply_learned_lead_times(edited, learned)
         if changes:
-            st.caption(":material/local_shipping: Lead times from real deliveries: " + "; ".join(changes))
+            st.caption(":material/local_shipping: Delivery times from real deliveries: " + "; ".join(changes))
 plan, daily = plan_for(A.data_key, edited, int(horizon), int(review), float(service), float(budget) if budget else None)
 
 counts = plan["status"].value_counts().reindex(STATUS_ORDER, fill_value=0)

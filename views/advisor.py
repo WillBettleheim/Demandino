@@ -41,9 +41,9 @@ with ui.card("adv-inputs"):
         price = float(h["regular_price"].iloc[-1])
         cost = c2.number_input(f"Unit cost ({ui.currency()})", 0.0, price * 10, round(price * 0.55, 2), 0.5,
                                key=f"adv_cost_{pid}", help="Needed to judge profit. Defaults to 55% of the price.")
-        horizon = c3.select_slider("Horizon (days)", [30, 60, 90, 120, 180], 90, key="adv_h")
+        horizon = c3.select_slider("Look ahead (days)", [30, 60, 90, 120, 180], 90, key="adv_h")
         stock = c4.number_input("Units in stock", 0, 10_000_000, 500, 10, key=f"adv_stock_{pid}")
-        target = st.number_input("Sales goal over the horizon (units, optional)", 0, 10_000_000, 0, 10,
+        target = st.number_input("Sales goal for this period (units, optional)", 0, 10_000_000, 0, 10,
                                  key=f"adv_goal_{pid}",
                                  help="We'll find the most profitable tested plan that reaches it.") or None
         inp = ForecastInputs(new=False, pid=pid, name=h["product_name"].iloc[0], category=h["category"].iloc[0],

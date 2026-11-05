@@ -203,6 +203,10 @@ div[data-testid="stMetricValue"] {font-family: "Space Grotesk", Inter, sans-seri
 .st-key-fc_kpis div[data-testid="stMetric"] {height: 100%; display: flex; flex-direction: column; container-type: inline-size;}
 .st-key-fc_kpis div[data-testid="stMetricValue"] {font-size: clamp(1.35rem, 15cqi, 2.1rem);}
 .st-key-fc_kpis div[data-testid="stMetricValue"] > div {overflow: visible; text-overflow: clip;}
+/* Labels and notes wrap rather than being cut off with "…". */
+.st-key-fc_kpis [data-testid="stMetricLabel"], .st-key-fc_kpis [data-testid="stMetricLabel"] *,
+.st-key-fc_kpis [data-testid="stMetricDelta"], .st-key-fc_kpis [data-testid="stMetricDelta"] *
+  {white-space: normal !important; overflow: visible !important; text-overflow: clip !important; height: auto; max-width: 100%;}
 
 /* Forecast page: input panel + results wrap onto separate rows when space is tight. */
 .st-key-fc_layout {container-type: inline-size;}

@@ -36,7 +36,7 @@ if not np.isnan(prof["promo_lift"]):
     lines.append(f"Promotions ran on {prof['promo_share'] * 100:.0f}% of days and lifted sales by "
                  f"**{prof['promo_lift'] * 100:+.0f}%** on average.")
 if not np.isnan(prof["elasticity"]):
-    lines.append(f"Price elasticity **{prof['elasticity']:.2f}**: {elasticity_effect(prof['elasticity'])}.")
+    lines.append(f"Price sensitivity **{prof['elasticity']:.2f}**: {elasticity_effect(prof['elasticity'])}.")
 if not np.isnan(prof["cv"]):
     vol = "very volatile" if prof["cv"] > 0.8 else "moderately volatile" if prof["cv"] > 0.4 else "stable"
     lines.append(f"Daily demand is **{vol}** (coefficient of variation {prof['cv']:.2f}).")

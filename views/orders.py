@@ -33,7 +33,7 @@ st.subheader("Supplier delivery times")
 sup = suppliers.stats(suppliers.deliveries(pos))
 if sup.empty:
     st.caption("Mark orders as **received** below (with the date they arrived) and each supplier's real delivery "
-               "time appears here. Demand planning then uses it instead of the lead time you typed in.")
+               "time appears here. Demand planning then uses it instead of the delivery time you typed in.")
 else:
     slower = sup[sup["trend"] == "Getting slower"]
     if len(slower):

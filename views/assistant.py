@@ -39,7 +39,7 @@ if not key:
     st.info("Add an Anthropic API key above to turn the assistant on.", icon=":material/key:")
     st.stop()
 
-ui.stat_strip([("Product", r.inputs.name), ("Horizon", f"{r.inputs.horizon} days"),
+ui.stat_strip([("Product", r.inputs.name), ("Period", f"{r.inputs.horizon} days"),
                ("Expected units", ui.num(r.total)), ("Profit", ui.money(r.profit))])
 
 chat_key = f"chat::{r.inputs.name}::{r.inputs.start:%Y%m%d}::{r.inputs.horizon}"

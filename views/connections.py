@@ -106,7 +106,7 @@ with t5:
     c1, c2, c3 = st.columns(3)
     so_days = c1.number_input("Warn when stock runs out within (days)", 1, 90, int(cfg.get("stockout_days", 14)))
     change = c2.number_input("Warn on demand change of (%)", 5, 500, int(cfg.get("change_pct", 30)))
-    horizon = c3.select_slider("Digest horizon (days)", [30, 60, 90], int(cfg.get("horizon", 30)))
+    horizon = c3.select_slider("Look ahead in the digest (days)", [30, 60, 90], int(cfg.get("horizon", 30)))
     st.markdown("##### Slack")
     has_slack = db.get_secret(uid, "slack_webhook") is not None
     hook = st.text_input("Incoming webhook URL" + (" (saved)" if has_slack else ""), type="password", max_chars=300,
