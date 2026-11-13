@@ -3,62 +3,78 @@ from __future__ import annotations
 
 import streamlit as st
 
-TERMS_VERSION = "1.1 · 29 October 2026"
+TERMS_VERSION = "1.2 · 13 November 2026"
 COOKIE = "dm_terms"
-COOKIE_VALUE = "v1.1-2026-10-29"  # remembers acceptance in this browser (e.g. across a light/dark reload)
+COOKIE_VALUE = "v1.2-2026-11-13"  # remembers acceptance in this browser (e.g. across a light/dark reload)
 
+# For whoever runs Demandino: these terms are a general starting point, not legal advice. Have a lawyer review them
+# before offering the app to customers, and add your own privacy policy if you host it for other people.
 TERMS_MD = """
 **Please read these terms before using Demandino.** By ticking *I accept* you agree to them.
 
-#### 1. What Demandino is
-Demandino is a decision-support tool. It uses machine-learning models to *estimate* future product demand from
-past sales and the details you provide, and suggests actions such as prices, promotions and reorder quantities.
+#### 1. What Demandino does
+Demandino estimates how many of each product you'll sell, from your past sales and the details you enter. It then
+suggests reorder dates, order quantities, prices and promotions. You decide what to do with them.
 
-#### 2. Forecasts are estimates, not guarantees
-- Every forecast is uncertain. Ranges show likely outcomes, but real sales can and sometimes will fall outside them.
-  The accuracy figures shown in the app describe past tests and do not guarantee future results.
-- Results depend on the quality and completeness of the data and details you enter.
-- Suggestions (pricing, promotions, orders, growth ideas) are informational only. They are **not** financial,
-  investment, legal, tax or accounting advice. Check important decisions with a qualified professional and your
-  own judgement.
+#### 2. Forecasts are estimates
+- Every forecast is uncertain. The range shows where sales will most likely land, but real sales will sometimes fall
+  outside it. **Model accuracy** shows how close the forecasts were on past sales they hadn't seen, which isn't a
+  promise about the future.
+- Results are only as good as the data and details you give. Numbers you haven't entered yet, such as stock or unit
+  cost, are filled in as examples and labelled that way, so replace them before acting on the advice.
+- Suggestions are not financial, tax or legal advice. Check big decisions yourself or with a professional.
 
 #### 3. Your data
-- Files you upload are processed **in memory on the server running this app** to produce your forecasts. They are
-  not sold or shared by Demandino.
-- Without an account, uploaded data is **not written to disk**. It is kept only for your session.
-- With an account, data is stored on the server **only when you choose to save it** (datasets, scenarios, tracked
-  forecasts, purchase orders, connected sources). You can delete it, or your whole account, at any time on the
-  Workspace page. Passwords are stored as one-way hashes; connector keys are encrypted.
-- **Optional services you switch on** send data to third parties: store connectors (Shopify, WooCommerce, Google
-  Sheets) fetch your sales from those services; alerts send summaries to the Slack channel or email address you set;
-  the AI assistant sends a summary of the forecast you are viewing (product, numbers, dates — not your raw files)
-  to Anthropic to generate an answer. Each service's own terms apply.
-- Share links let anyone with the link view the shared summary until it expires or you revoke it.
-- Cookies are used only to remember that you accepted these terms and, if you sign in, to keep you signed in.
-- Only upload data you have the right to use. Do not upload personal data about customers (names, emails,
-  addresses, payment details). Demandino only needs dates, products, quantities and prices.
-- If someone else hosts this app for you, their own privacy policy and security practices also apply.
+- Files you upload are used only to make your forecasts. Without an account they stay in memory for your visit and
+  aren't saved.
+- With an account, data is saved only when you choose to save it: datasets, scenarios, product edits, stock tables,
+  targets, tracked forecasts and purchase orders. You can delete any of it, or your whole account, on the Workspace
+  page. Deleting your account needs your password and can't be undone.
+- Passwords are stored as one-way hashes, and keys you save for connected services are encrypted and never shown
+  again.
+- Each account can store a limited amount, such as 10 datasets and 200 scenarios.
+- Editing or removing a product changes only how Demandino shows it. Your original sales data stays as it was, and
+  you can undo the changes.
+- Only upload sales data you have the right to use. Demandino needs dates, products, quantities and prices, so leave
+  out customer details such as names, emails, addresses and payment details.
 
-#### 4. Acceptable use
-You agree not to upload malicious files, try to break or overload the service, access other users' data, or use the
-app for anything unlawful.
+#### 4. Cookies and what your browser remembers
+Demandino uses three cookies: one to remember that you accepted these terms, one to keep you signed in for up to 14
+days, and one to remember that you closed the getting-started guide. Your browser also remembers whether you chose
+light or dark mode. Demandino uses no advertising or tracking cookies.
 
-#### 5. Sample and third-party data
-- The *Sample* dataset is simulated and for demonstration only.
-- The *Real store* dataset is derived from **UCI Online Retail II** (Chen, D., 2012), licensed under
-  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). It is used here for testing and demonstration.
+To protect accounts, the server briefly records the network address of failed sign-ins and new accounts, and keeps a
+history of your sign-ins and changes, which you can see on the Security and Change history pages.
 
-#### 6. No warranty and limitation of liability
-Demandino is provided **"as is"**, without warranties of any kind, express or implied, including accuracy, fitness for
-a particular purpose and non-infringement. To the fullest extent permitted by law, the authors are not liable for
-any loss or damage (including lost profits, excess or insufficient stock, or business interruption) arising from
-use of, or reliance on, the app or its results.
+#### 5. Services you choose to connect
+These only send or fetch data when you turn them on:
+- **Store imports** (Google Sheets, Shopify, WooCommerce, Amazon reports) fetch your sales from those services.
+- **Alerts** send summaries to the Slack channel or email addresses you enter.
+- **Ask Demandino** sends a summary of the forecast you're viewing to Anthropic, which makes the AI model behind the
+  assistant. That covers the product name, numbers, dates and findings, not your sales files. Answers can be wrong,
+  so check them against the forecast.
+- **Weather** sends a place and dates to Open-Meteo.
+- **Share links** let anyone who has the link see that forecast summary for 7 days, or until you revoke it.
 
-#### 7. Changes
-These terms may be updated. If they change, you will be asked to accept the new version.
+Each service's own terms apply.
 
-*Version {version}. This is a general template, not legal advice. Have it reviewed by a lawyer before offering
-Demandino to customers.*
+#### 6. Fair use
+Don't upload harmful files, try to get into other people's accounts or data, overload the app or use it for anything
+unlawful. To keep the app working for everyone, there are limits on file size, new forecasts per hour and assistant
+questions.
+
+#### 7. Data included with Demandino
+The *Sample* shop is made up, for trying the app. The *Real store* data comes from UCI Online Retail II (Chen, 2012),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+
+#### 8. No warranty
+Demandino is provided **"as is"**, without any warranty. As far as the law allows, its makers aren't responsible
+for losses from using it or relying on its results, such as lost sales, too much or too little stock, or lost profit.
+
+#### 9. Changes to these terms
+If these terms change, you'll be asked to accept the new version before continuing.
+
+*Version {version}.*
 """
 
 
